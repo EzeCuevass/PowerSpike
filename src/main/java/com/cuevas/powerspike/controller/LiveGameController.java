@@ -21,6 +21,7 @@ public class LiveGameController {
     @GetMapping("/live-game/{gameName}/{tagLine}")
     public CurrentGameInfo getLiveGame(@PathVariable String gameName,
                                         @PathVariable String tagLine) {
+        // Agarra el summoner usando el RiotApiClient y luego usar su puuid para obtener la información del juego en vivo
         SummonerDTO summoner = riotApiClient.getSummonerByRiotId(gameName, tagLine);
         return riotApiClient.getLiveGame(summoner.puuid());
     }

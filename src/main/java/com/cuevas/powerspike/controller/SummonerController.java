@@ -18,6 +18,7 @@ public class SummonerController {
 
     @GetMapping("/summoner/{gameName}/{tagLine}")
     public SummonerDTO getSummoner(@PathVariable String gameName, @PathVariable String tagLine){
+        // Agarra los datos del summoner usando el RiotApiClient y los devuelve como un SummonerDTO
         return riotApiClient.getSummonerByRiotId(gameName, tagLine);
     }
 }

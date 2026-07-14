@@ -19,11 +19,13 @@ public class ChampionController {
 
     @GetMapping("/champions")
     public Map<Long, String> getAllChampions() {
+        // Devuelve un mapa de todos los campeones con su ID y nombre usando el DataDragonClient
         return dataDragonClient.getAllChampions();
     }
 
     @GetMapping("/champions/{id}")
     public String getChampionName(@PathVariable long id) {
+        // Devuelve el nombre del campeón usando el DataDragonClient
         String name = dataDragonClient.getChampionName(id);
         return name != null ? name : "Unknown champion";
     }

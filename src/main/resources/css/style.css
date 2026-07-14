@@ -1,0 +1,201 @@
+* {
+    -fx-dark-bg: #0d1117;
+    -fx-card-bg: #161b22;
+    -fx-card-border: #30363d;
+    -fx-primary: #58a6ff;
+    -fx-primary-hover: #79b8ff;
+    -fx-text-primary: #f0f6fc;
+    -fx-text-secondary: #8b949e;
+    -fx-text-muted: #484f58;
+    -fx-success: #3fb950;
+    -fx-danger: #f85149;
+    -fx-input-bg: #0d1117;
+    -fx-input-border: #30363d;
+}
+
+.root {
+    -fx-background-color: -fx-dark-bg;
+    -fx-font-family: 'Segoe UI', 'Inter', sans-serif;
+    -fx-font-size: 13px;
+}
+
+.scroll-pane {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.search-bar {
+    -fx-background-color: -fx-card-bg;
+    -fx-background-radius: 8;
+    -fx-border-color: -fx-card-border;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 12 16;
+    -fx-spacing: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 8, 0, 0, 2);
+}
+
+.text-field {
+    -fx-background-color: -fx-input-bg;
+    -fx-text-fill: -fx-text-primary;
+    -fx-prompt-text-fill: -fx-text-muted;
+    -fx-background-radius: 6;
+    -fx-padding: 8 14;
+    -fx-border-color: -fx-input-border;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-font-size: 14;
+}
+
+.text-field:focused {
+    -fx-border-color: -fx-primary;
+}
+
+.btn-search {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: white;
+    -fx-background-radius: 6;
+    -fx-padding: 8 24;
+    -fx-font-weight: bold;
+    -fx-font-size: 14;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(88,166,255,0.3), 4, 0, 0, 1);
+}
+
+.btn-search:hover {
+    -fx-background-color: -fx-primary-hover;
+}
+
+.btn-search:pressed {
+    -fx-background-color: #4a90d9;
+}
+
+.section-card {
+    -fx-background-color: -fx-card-bg;
+    -fx-background-radius: 8;
+    -fx-border-color: -fx-card-border;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 16;
+    -fx-spacing: 12;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 6, 0, 0, 1);
+}
+
+.section-title {
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 11;
+    -fx-font-weight: bold;
+}
+
+.info-label {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+}
+
+.info-value {
+    -fx-text-fill: -fx-primary;
+    -fx-font-weight: bold;
+    -fx-font-size: 14;
+}
+
+.subtitle-text {
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 12;
+}
+
+.error-text {
+    -fx-text-fill: -fx-danger;
+    -fx-font-size: 13;
+    -fx-padding: 8 0 0 0;
+}
+
+.team-panel {
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-spacing: 6;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+
+.team-blue {
+    -fx-background-color: rgba(30, 90, 180, 0.12);
+    -fx-border-color: rgba(30, 90, 180, 0.4);
+}
+
+.team-red {
+    -fx-background-color: rgba(180, 30, 30, 0.12);
+    -fx-border-color: rgba(180, 30, 30, 0.4);
+}
+
+.participant-card {
+    -fx-background-color: -fx-input-bg;
+    -fx-background-radius: 6;
+    -fx-padding: 8 12;
+    -fx-spacing: 8;
+    -fx-border-color: -fx-card-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+}
+
+.participant-card:hover {
+    -fx-border-color: -fx-primary;
+}
+
+.participant-name {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 13;
+    -fx-font-weight: bold;
+}
+
+.participant-champion {
+    -fx-text-fill: -fx-primary;
+    -fx-font-size: 12;
+}
+
+.btn-live {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-primary;
+    -fx-border-color: -fx-primary;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-padding: 10 24;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.btn-live:hover {
+    -fx-background-color: rgba(88, 166, 255, 0.1);
+}
+
+.profile-icon {
+    -fx-fit-width: 72;
+    -fx-fit-height: 72;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.header-text {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+}
+
+.header-accent {
+    -fx-text-fill: -fx-primary;
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+}
+
+.champion-icon {
+    -fx-fit-width: 36;
+    -fx-fit-height: 36;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}

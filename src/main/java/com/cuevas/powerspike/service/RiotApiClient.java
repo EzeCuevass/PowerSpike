@@ -34,7 +34,8 @@ public class RiotApiClient {
         this.platformUrl = platformUrl;
         this.summonerRepository = summonerRepository;
     }
-
+    // Recibe por parametros el gamename y tagline
+    // Devuelve un AccountDTO con la información del invocador
     public AccountDTO getAccountByRiotId(String gameName, String tagLine) {
         String url = accountUrl + "/riot/account/v1/accounts/by-riot-id/" + gameName + "/" + tagLine;
 
@@ -42,7 +43,7 @@ public class RiotApiClient {
         headers.set("X-Riot-Token", apiKey);
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-
+        // Peticion GET a la API de Riot para obtener la información del invocador
         ResponseEntity<AccountDTO> response = restTemplate.exchange(
                 url,
                 HttpMethod.GET,
@@ -52,7 +53,8 @@ public class RiotApiClient {
 
         return response.getBody();
     }
-
+    // Recibe por parametros el puuid del invocador
+    // Devuelve un SummonerDTO con la información del invocador
     public SummonerDTO getSummonerByPuuid(String puuid) {
         String url = platformUrl + "/lol/summoner/v4/summoners/by-puuid/" + puuid;
 
@@ -60,7 +62,7 @@ public class RiotApiClient {
         headers.set("X-Riot-Token", apiKey);
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-
+        // Peticion GET a la API de Riot para obtener la información del invocador
         ResponseEntity<SummonerDTO> response = restTemplate.exchange(
                 url,
                 HttpMethod.GET,
@@ -73,7 +75,7 @@ public class RiotApiClient {
 
     public SummonerDTO getSummonerByRiotId(String gameName, String tagLine) {
         Optional<SummonerEntity> cached = summonerRepository.findByGameNameAndTagLine(gameName, tagLine);
-
+        // Si el invocador está en caché y la información es reciente, se devuelve la información de la caché
         if (cached.isPresent()) {
             SummonerEntity entity = cached.get();
             if (entity.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(5))) {
@@ -88,6 +90,7 @@ public class RiotApiClient {
             }
         }
 
+        // Si no está en caché o la información está desactualizada, se obtiene de la API de Riot
         AccountDTO account = getAccountByRiotId(gameName, tagLine);
         SummonerDTO summoner = getSummonerByPuuid(account.puuid());
 
@@ -103,6 +106,8 @@ public class RiotApiClient {
                 summoner.summonerLevel(), summoner.profileIconId(), summoner.revisionDate()
         );
     }
+    // Recibe por parametros el puuid del invocador
+    // Devuelve un CurrentGameInfo con la información del juego en vivo
     public CurrentGameInfo getLiveGame(String puuid) {
         String url = platformUrl + "/lol/spectator/v5/active-games/by-summoner/" + puuid;
 

@@ -1,7 +1,14 @@
 plugins {
 	id 'java'
+	id 'application'
 	id 'org.springframework.boot' version '4.1.0'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+javafx {
+	version = '21'
+	modules = ['javafx.controls', 'javafx.fxml']
 }
 
 group = 'com.cuevas'
@@ -30,6 +37,14 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	implementation 'org.openjfx:javafx-controls:21'
+	implementation 'org.openjfx:javafx-fxml:21'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.3'
+}
+
+application {
+	mainClass = 'com.cuevas.powerspike.ui.JavaFxApplication'
 }
 
 tasks.named('test') {
