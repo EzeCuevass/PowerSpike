@@ -5,9 +5,12 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.HttpClientErrorException;
 import java.util.Map;
+import java.util.logging.Logger;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = Logger.getLogger(GlobalExceptionHandler.class.getName());
 
     @ExceptionHandler(SummonerNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleSummonerNotFound(SummonerNotFoundException e) {
@@ -32,6 +35,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneric(Exception e) {
-        return ResponseEntity.status(500).body(Map.of("error", "Error interno del servidor"));
+        log.severe("Error no manejado: " + e.getClass().getName() + " - " + e.getMessage());
+        e.printStackTrace();
+        return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
     }
 }
