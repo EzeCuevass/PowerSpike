@@ -17,6 +17,7 @@ public class LcuApi {
     private final LcuLockfile lcuLockfile;
     private final LcuWebSocket lcuWebSocket;
     private final DataDragonClient dataDragonClient;
+    private final GameStateService gameStateService;
 
     private String currentPhase = "CLOSED";
     private LcuChampSelectDTO currentChampSelect;
@@ -25,43 +26,51 @@ public class LcuApi {
     public LcuApi(@Qualifier("lcuRestTemplate") RestTemplate lcuRestTemplate,
                   LcuLockfile lcuLockfile,
                   LcuWebSocket lcuWebSocket,
-                  DataDragonClient dataDragonClient) {
+                  DataDragonClient dataDragonClient,
+                  GameStateService gameStateService) {
         this.lcuRestTemplate = lcuRestTemplate;
         this.lcuLockfile = lcuLockfile;
         this.lcuWebSocket = lcuWebSocket;
         this.dataDragonClient = dataDragonClient;
+        this.gameStateService = gameStateService;
     }
 
     @Scheduled(fixedDelay = 2000)
     public void pollPhase() {
         lcuLockfile.check();
         if (!lcuLockfile.isConnected()) {
-            currentPhase = "CLOSED";
-            currentChampSelect = null;
+            if (!"CLOSED".equals(currentPhase)) {
+                currentPhase = "CLOSED";
+                currentChampSelect = null;
+                gameStateService.updatePhase("CLOSED");
+                gameStateService.clearChampSelect();
+            }
             return;
         }
         try {
             String phase = getPhase();
             if (phase != null && !phase.equals(currentPhase)) {
-                System.out.println(">>> Fase cambiada: " + phase);
                 currentPhase = phase;
+                gameStateService.updatePhase(phase);
 
                 if ("ChampSelect".equals(phase)) {
-                    System.out.println(">>> [WS] Conectando WebSocket para champ select...");
                     lcuWebSocket.connectToLCU();
                 } else if (lcuWebSocket.isOpen()) {
-                    System.out.println(">>> [WS] Cerrando WebSocket (fase: " + phase + ")");
                     lcuWebSocket.disconnect();
                 }
             }
 
             if (!"ChampSelect".equals(currentPhase)) {
-                currentChampSelect = null;
-                champSelectError = null;
+                if (currentChampSelect != null) {
+                    currentChampSelect = null;
+                    champSelectError = null;
+                    gameStateService.clearChampSelect();
+                }
             }
 
         } catch (Exception e) {
             currentPhase = "ERROR";
+            gameStateService.updatePhase("ERROR");
         }
     }
 
@@ -132,6 +141,7 @@ public class LcuApi {
 
     public void updateChampSelect(LcuChampSelectDTO data) {
         this.currentChampSelect = data;
+        gameStateService.updateChampSelect(data);
     }
 
     public String getChampionName(long championId) {

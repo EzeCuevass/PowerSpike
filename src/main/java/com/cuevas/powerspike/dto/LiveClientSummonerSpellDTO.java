@@ -1,5 +1,3 @@
 package com.cuevas.powerspike.dto;
 
-public record LiveClientSummonerSpellDTO(
-        String displayName
-) {}
+public record LiveClientSummonerSpellDTO(String displayName) {}

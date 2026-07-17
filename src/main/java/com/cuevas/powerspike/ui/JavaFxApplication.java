@@ -23,11 +23,11 @@ public class JavaFxApplication extends Application {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main-view.fxml"));
         loader.setControllerFactory(springContext::getBean);
         Parent root = loader.load();
-        Scene scene = new Scene(root, 900, 700);
+        Scene scene = new Scene(root, 950, 720);
         scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
         stage.setTitle("PowerSpike");
-        stage.setMinWidth(700);
-        stage.setMinHeight(500);
+        stage.setMinWidth(750);
+        stage.setMinHeight(550);
         stage.setScene(scene);
         stage.show();
     }
