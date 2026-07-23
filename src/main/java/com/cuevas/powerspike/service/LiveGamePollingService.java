@@ -21,9 +21,6 @@ public class LiveGamePollingService {
         try {
             LiveClientAllDataDTO data = liveClientApi.getAllGameData();
             if (data != null && data.activePlayer() != null) {
-                if (!lastPollSuccessful) {
-                    System.out.println(">>> [LivePoll] OK - Jugador: " + data.activePlayer().summonerName() + " - " + data.activePlayer().championName());
-                }
                 gameStateService.updateLiveGameData(data);
                 lastPollSuccessful = true;
             } else {
@@ -33,10 +30,6 @@ public class LiveGamePollingService {
                 lastPollSuccessful = false;
             }
         } catch (Exception e) {
-            Throwable cause = e.getCause();
-            while (cause != null && cause.getCause() != null) cause = cause.getCause();
-            String detail = cause != null ? cause.getClass().getSimpleName() + ": " + cause.getMessage() : e.getMessage();
-            System.out.println(">>> [LivePoll] Error: " + e.getClass().getSimpleName() + " -> " + detail);
             if (lastPollSuccessful) {
                 gameStateService.clearLiveGameData();
             }

@@ -15,6 +15,25 @@ public class GameStateService {
     private final BooleanProperty inGame = new SimpleBooleanProperty(false);
     private final BooleanProperty inChampSelect = new SimpleBooleanProperty(false);
     private final StringProperty activePlayerName = new SimpleStringProperty("");
+    private final StringProperty myPuuid = new SimpleStringProperty("");
+    private final StringProperty myRole = new SimpleStringProperty("");
+    private final StringProperty myGameName = new SimpleStringProperty("");
+    private final StringProperty myTagLine = new SimpleStringProperty("");
+
+    public void setMyPuuid(String puuid) {
+        Platform.runLater(() -> myPuuid.set(puuid != null ? puuid : ""));
+    }
+
+    public void setMyRole(String role) {
+        Platform.runLater(() -> myRole.set(role != null ? role : ""));
+    }
+
+    public void setMyRiotId(String gameName, String tagLine) {
+        Platform.runLater(() -> {
+            myGameName.set(gameName != null ? gameName : "");
+            myTagLine.set(tagLine != null ? tagLine : "");
+        });
+    }
 
     public void updatePhase(String phase) {
         Platform.runLater(() -> {
@@ -56,6 +75,13 @@ public class GameStateService {
     public BooleanProperty inGameProperty() { return inGame; }
     public BooleanProperty inChampSelectProperty() { return inChampSelect; }
     public StringProperty activePlayerNameProperty() { return activePlayerName; }
+    public StringProperty myPuuidProperty() { return myPuuid; }
+    public StringProperty myRoleProperty() { return myRole; }
+    public String getMyPuuid() { return myPuuid.get(); }
+    public String getMyRole() { return myRole.get(); }
+    public String getMyGameName() { return myGameName.get(); }
+    public String getMyTagLine() { return myTagLine.get(); }
+    public String getActivePlayerName() { return activePlayerName.get(); }
 
     public String getGamePhase() { return gamePhase.get(); }
     public LcuChampSelectDTO getChampSelect() { return champSelect.get(); }

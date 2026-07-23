@@ -110,6 +110,18 @@ public class LcuWebSocket {
 
             System.out.println(">>> [WS] Evento: " + eventData.eventType());
 
+            // No actualizar si el evento es Delete (champ select terminó) o si los equipos están vacíos
+            // Esto preserva el último champ select válido para el análisis post-game
+            if ("Delete".equals(eventData.eventType())) {
+                System.out.println(">>> [WS] Evento Delete ignorado, manteniendo último champ select válido");
+                return;
+            }
+
+            if (session.myTeam() == null || session.myTeam().isEmpty()) {
+                System.out.println(">>> [WS] Equipos vacíos, ignorando evento");
+                return;
+            }
+
             if (session.timer() != null) {
                 long secs = session.timer().adjustedTimeLeftInPhase() / 1000;
                 System.out.println(">>> [WS] Timer: " + session.timer().phase() + " - " + secs + "s restantes");

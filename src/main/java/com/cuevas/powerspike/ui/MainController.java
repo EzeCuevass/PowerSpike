@@ -4,6 +4,10 @@ import com.cuevas.powerspike.dto.*;
 import com.cuevas.powerspike.service.DataDragonClient;
 import com.cuevas.powerspike.service.GameStateService;
 import com.cuevas.powerspike.service.RiotApiClient;
+import com.cuevas.powerspike.service.analysis.AnalysisEngine;
+import com.cuevas.powerspike.service.analysis.AnalysisResult;
+import com.cuevas.powerspike.service.analysis.AnalysisTrigger;
+import com.cuevas.powerspike.service.analysis.OpenAIClient;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -16,7 +20,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 @Component
 @SuppressWarnings("unused")
@@ -25,7 +30,7 @@ public class MainController {
     @FXML private TextField gameNameField;
     @FXML private TextField tagLineField;
     @FXML private Button searchButton;
-    @FXML private VBox summonerCard;
+    @FXML private HBox summonerHeaderCard;
     @FXML private Label summonerNameLabel;
     @FXML private Label summonerLevelLabel;
     @FXML private Label summonerPuuidLabel;
@@ -59,17 +64,31 @@ public class MainController {
     @FXML private VBox liveBlueTeamPanel;
     @FXML private VBox liveRedTeamPanel;
     @FXML private VBox liveWaitingContainer;
+    @FXML private Tab coachTab;
+    @FXML private VBox coachResultCard;
+    @FXML private Label coachTriggerLabel;
+    @FXML private Label coachTimeLabel;
+    @FXML private Label coachResponseLabel;
+    @FXML private VBox coachHistoryContainer;
+    @FXML private VBox coachWaitingContainer;
+    @FXML private Label coachConfigLabel;
 
     private final RiotApiClient riotApiClient;
     private final DataDragonClient dataDragonClient;
     private final GameStateService gameStateService;
+    private final AnalysisEngine analysisEngine;
+    private final OpenAIClient openAIClient;
 
     public MainController(RiotApiClient riotApiClient,
                           DataDragonClient dataDragonClient,
-                          GameStateService gameStateService) {
+                          GameStateService gameStateService,
+                          AnalysisEngine analysisEngine,
+                          OpenAIClient openAIClient) {
         this.riotApiClient = riotApiClient;
         this.dataDragonClient = dataDragonClient;
         this.gameStateService = gameStateService;
+        this.analysisEngine = analysisEngine;
+        this.openAIClient = openAIClient;
     }
 
     @FXML
@@ -81,8 +100,13 @@ public class MainController {
         gameStateService.gamePhaseProperty().addListener((obs, oldVal, newVal) -> updatePhaseUI(newVal));
         gameStateService.champSelectProperty().addListener((obs, oldVal, newVal) -> updateChampSelectUI(newVal));
         gameStateService.liveGameDataProperty().addListener((obs, oldVal, newVal) -> updateLiveGameUI(newVal));
+        analysisEngine.latestResultProperty().addListener((obs, oldVal, newVal) -> updateCoachUI(newVal));
 
         updatePhaseUI(gameStateService.getGamePhase());
+
+        coachConfigLabel.setText(openAIClient.isConfigured()
+                ? "IA configurada (gpt-5.4-mini)"
+                : "IA no configurada - agregá openai.api.key en application.properties");
     }
 
     private void updatePhaseUI(String phase) {
@@ -321,10 +345,12 @@ public class MainController {
 
         try {
             SummonerDTO summoner = riotApiClient.getSummonerByRiotId(gameName, tagLine);
+            gameStateService.setMyPuuid(summoner.puuid());
+            gameStateService.setMyRiotId(summoner.gameName(), summoner.tagLine());
             mostrarInvocador(summoner);
         } catch (Exception e) {
-            summonerCard.setVisible(false);
-            summonerCard.setManaged(false);
+            summonerHeaderCard.setVisible(false);
+            summonerHeaderCard.setManaged(false);
             searchErrorLabel.setText("Error: " + e.getMessage());
         }
     }
@@ -335,9 +361,48 @@ public class MainController {
 
         summonerNameLabel.setText(summoner.gameName() + "#" + summoner.tagLine());
         summonerLevelLabel.setText("Nivel " + summoner.summonerLevel());
-        summonerPuuidLabel.setText("PUUID: " + summoner.puuid());
 
-        summonerCard.setVisible(true);
-        summonerCard.setManaged(true);
+        summonerHeaderCard.setVisible(true);
+        summonerHeaderCard.setManaged(true);
+    }
+
+    private void updateCoachUI(AnalysisResult result) {
+        if (result == null) return;
+
+        coachResultCard.setVisible(true);
+        coachResultCard.setManaged(true);
+        coachWaitingContainer.setVisible(false);
+        coachWaitingContainer.setManaged(false);
+
+        String triggerName = switch (result.trigger()) {
+            case CHAMP_SELECT_END -> "CHAMP SELECT";
+            case DEATH -> "MUERTE";
+            case GAME_END -> "POST-GAME";
+        };
+        coachTriggerLabel.setText(triggerName);
+        coachTimeLabel.setText(new SimpleDateFormat("HH:mm:ss").format(new Date(result.timestamp())));
+
+        if (result.success()) {
+            coachResponseLabel.setText(result.response());
+            coachResponseLabel.getStyleClass().setAll("coach-response");
+        } else {
+            coachResponseLabel.setText("Error: " + result.errorMessage());
+            coachResponseLabel.getStyleClass().setAll("coach-response", "error-text");
+        }
+
+        VBox historyCard = new VBox(8);
+        historyCard.getStyleClass().add("card");
+        historyCard.getStyleClass().add("coach-history-card");
+
+        Label historyTrigger = new Label(triggerName + " - " + coachTimeLabel.getText());
+        historyTrigger.getStyleClass().add("coach-trigger-label");
+        Label historyResponse = new Label(result.success() ? result.response() : "Error: " + result.errorMessage());
+        historyResponse.getStyleClass().add("coach-response");
+        historyResponse.setWrapText(true);
+
+        historyCard.getChildren().addAll(historyTrigger, historyResponse);
+        coachHistoryContainer.getChildren().addFirst(historyCard);
+
+        mainTabPane.getSelectionModel().select(coachTab);
     }
 }
