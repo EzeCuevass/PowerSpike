@@ -376,6 +376,7 @@ public class MainController {
 
         String triggerName = switch (result.trigger()) {
             case CHAMP_SELECT_END -> "CHAMP SELECT";
+            case LIVE_CLIENT_MATCHUP -> "MATCHUP CONCRETO";
             case DEATH -> "MUERTE";
             case GAME_END -> "POST-GAME";
         };

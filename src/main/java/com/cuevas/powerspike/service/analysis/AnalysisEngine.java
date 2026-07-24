@@ -68,9 +68,13 @@ public class AnalysisEngine {
             onPhaseChange(oldVal, newVal);
         });
 
-        // Actualización de datos en vivo → detecta muertes
+        // Actualización de datos en vivo → detecta muertes y primera conexión del Live Client
         gameStateService.liveGameDataProperty().addListener((obs, oldVal, newVal) -> {
             onLiveGameUpdate(oldVal, newVal);
+            // Primeros datos del Live Client → análisis concreto de matchup
+            if (oldVal == null && newVal != null && newVal.activePlayer() != null) {
+                triggerLiveClientMatchupAnalysis(newVal);
+            }
         });
     }
 
@@ -153,9 +157,12 @@ public class AnalysisEngine {
         System.out.println(">>> [DEBUG CS] cs.theirTeam.size: " + (cs.theirTeam() != null ? cs.theirTeam().size() : "null"));
         System.out.println(">>> [DEBUG CS] cs.bans: " + cs.bans());
 
-        LiveClientAllDataDTO liveData = gameStateService.getLiveGameData();
-        String myName = liveData != null && liveData.activePlayer() != null
-                ? liveData.activePlayer().summonerName() : "Jugador";
+        // Usar el nombre guardado del invocador, no el del LiveClient (no existe en champ select)
+        String myGameName = gameStateService.getMyGameName();
+        String myTagLine = gameStateService.getMyTagLine();
+        String myName = (myGameName != null && !myGameName.isEmpty())
+                ? myGameName + "#" + myTagLine
+                : "Jugador";
 
         String myPuuid = gameStateService.getMyPuuid();
         System.out.println(">>> [DEBUG CS] Mi puuid guardado: '" + myPuuid + "'");
@@ -203,9 +210,8 @@ public class AnalysisEngine {
     }
 
     /**
-     * Dispara análisis de muerte.
-     * Incluye: minuto de la partida, campeón del jugador, stats del evento de muerte,
-     * rol del jugador (guardado durante champ select), y contexto de la partida.
+     * Dispara análisis de muerte con contexto completo:
+     * posición en el mapa, visión, asistentes del killer, comparación stats.
      */
     private void triggerDeathAnalysis(LiveClientAllDataDTO data, LiveClientEventDTO deathEvent) {
         if (!openAIClient.isConfigured()) return;
@@ -215,20 +221,56 @@ public class AnalysisEngine {
         String myRole = gameStateService.getMyRole();
         int minute = (int) (deathEvent.EventTime() / 60.0);
 
-        // Determinar fase de la partida según el minuto
-        String gamePhase;
-        if (minute < 15) gamePhase = "early game (laning phase)";
-        else if (minute < 25) gamePhase = "mid game (rotations)";
-        else gamePhase = "late game (team fights)";
+        // Buscar mi player en allPlayers para obtener team y stats
+        LiveClientPlayerDTO myPlayer = data.allPlayers().stream()
+                .filter(p -> p.summonerName().equals(myName) || p.championName().equals(myChamp))
+                .findFirst().orElse(null);
+        String myTeam = myPlayer != null ? myPlayer.team() : "ORDER";
 
-        // Buscar eventos cercanos a la muerte para contexto
-        String nearbyEvents = findNearbyEvents(data.events(), deathEvent.EventTime());
+        // Buscar al killer en allPlayers
+        LiveClientPlayerDTO killer = data.allPlayers().stream()
+                .filter(p -> deathEvent.KillerName() != null && 
+                    (p.summonerName().equals(deathEvent.KillerName()) || p.championName().equals(deathEvent.KillerName())))
+                .findFirst().orElse(null);
 
+        // Clasificar zona de muerte
+        String deathZone = "desconocida";
+        boolean hasVision = false;
+        if (deathEvent.position() != null) {
+            MapZoneClassifier.Zone zone = MapZoneClassifier.classify(
+                    deathEvent.position().x(), deathEvent.position().y(), myTeam);
+            deathZone = zone.label;
+            hasVision = MapZoneClassifier.hasNearbyVision(data.events(), deathEvent.EventTime(), deathEvent.position());
+        }
+
+        // Contexto de asistentes: 1v1 vs gank
+        int assisters = deathEvent.Assisters() != null ? deathEvent.Assisters().size() : 0;
+        String fightType = assisters == 0 ? "1v1 (duelo individual)"
+                : assisters == 1 ? "1v2 (ganked)"
+                : "1v" + (assisters + 1) + " (ganked o team fight)";
+
+        String assistersList = "";
+        if (deathEvent.Assisters() != null && !deathEvent.Assisters().isEmpty()) {
+            assistersList = "Asistentes del killer: " + String.join(", ", deathEvent.Assisters());
+        }
+
+        // Comparación con el killer
+        String killerComparison = "";
+        if (killer != null && myPlayer != null) {
+            int levelDiff = killer.level() - myPlayer.level();
+            int csDiff = (killer.scores() != null ? killer.scores().creepScore() : 0)
+                    - (myPlayer.scores() != null ? myPlayer.scores().creepScore() : 0);
+            killerComparison = String.format("Killer: Lv.%d (%s%d), %s%d CS vs vos. %s",
+                    killer.level(),
+                    levelDiff > 0 ? "+" : "", levelDiff,
+                    csDiff > 0 ? "+" : "", csDiff,
+                    levelDiff > 0 ? "Te supera en nivel." : "Estás igual o mejor en nivel.");
+        }
+
+        String prompt = promptBuilder.buildDeathPrompt(data, deathEvent, myRole, deathZone, 
+                hasVision, fightType, killerComparison, assistersList);
+        
         AnalysisContext ctx = AnalysisContext.death(data, deathEvent, myChamp, myName, minute);
-        ctx = new AnalysisContext(ctx.trigger(), ctx.champSelect(), ctx.liveGameData(), ctx.deathEvent(),
-                ctx.myChampion(), myRole, ctx.enemyChampion(), ctx.enemyRole(), ctx.gameMinute(), ctx.mySummonerName());
-
-        String prompt = promptBuilder.buildDeathPrompt(ctx, myRole, gamePhase, nearbyEvents);
         runAnalysis(ctx, prompt);
     }
 
@@ -253,9 +295,40 @@ public class AnalysisEngine {
     }
 
     /**
-     * Dispara análisis post-game.
-     * Usa los datos del LiveClient al momento de terminar la partida.
+     * Análisis concreto de matchup cuando el Live Client conecta.
+     * A diferencia del champ select (especulativo), acá tenemos roles exactos de los 10 jugadores.
      */
+    private void triggerLiveClientMatchupAnalysis(LiveClientAllDataDTO data) {
+        if (!openAIClient.isConfigured()) return;
+
+        String myName = data.activePlayer().summonerName();
+
+        // Buscar mi jugador y el enemigo de la misma línea
+        LiveClientPlayerDTO myPlayer = data.allPlayers().stream()
+                .filter(p -> p.summonerName().equals(myName) || p.championName().equals(data.activePlayer().championName()))
+                .findFirst().orElse(null);
+
+        if (myPlayer == null) return;
+
+        String myRole = myPlayer.position();
+        String myTeam = myPlayer.team();
+        gameStateService.setMyRole(myRole);
+
+        // Buscar enemigo de la misma posición en el equipo contrario
+        LiveClientPlayerDTO enemyPlayer = data.allPlayers().stream()
+                .filter(p -> !p.team().equals(myTeam))
+                .filter(p -> myRole != null && myRole.equals(p.position()))
+                .findFirst().orElse(null);
+
+        String enemyChamp = enemyPlayer != null ? enemyPlayer.championName() : "desconocido";
+
+        // Guardar el enemigo del matchup para usarlo en análisis de muertes
+        gameStateService.setMyEnemyChampion(enemyChamp);
+        gameStateService.setMyEnemyName(enemyPlayer != null ? enemyPlayer.summonerName() : null);
+
+        String prompt = promptBuilder.buildLiveClientMatchupPrompt(data, myPlayer, enemyPlayer);
+        runAnalysis(AnalysisTrigger.LIVE_CLIENT_MATCHUP, prompt);
+    }
     private void triggerGameEndAnalysis(LiveClientAllDataDTO data) {
         if (!openAIClient.isConfigured()) return;
 
@@ -266,26 +339,20 @@ public class AnalysisEngine {
         runAnalysis(ctx, promptBuilder.buildGameEndPrompt(ctx));
     }
 
-    /**
-     * Ejecuta el análisis en un hilo separado para no bloquear la UI.
-     * Actualiza el timestamp del último análisis (para el cooldown).
-     * Publica el resultado en el JavaFX Application Thread via Platform.runLater().
-     * También reproduce el audio si el TTS está configurado.
-     */
-    private void runAnalysis(AnalysisContext ctx, String prompt) {
+    private void runAnalysis(AnalysisTrigger trigger, String prompt) {
         executor.submit(() -> {
             lastAnalysisTime = System.currentTimeMillis();
-
             String response = openAIClient.chat(prompt);
-            AnalysisResult result = AnalysisResult.success(ctx.trigger(), prompt, response);
-
+            AnalysisResult result = AnalysisResult.success(trigger, prompt, response);
             Platform.runLater(() -> latestResult.set(result));
-            
-            // Reproducir audio si está configurado
             if (ttsClient.isConfigured() && response != null && !response.startsWith("[Error]")) {
                 ttsClient.speak(response, "Speak in a friendly and encouraging tone, like a coach giving advice.");
             }
         });
+    }
+
+    private void runAnalysis(AnalysisContext ctx, String prompt) {
+        runAnalysis(ctx.trigger(), prompt);
     }
 
     /**

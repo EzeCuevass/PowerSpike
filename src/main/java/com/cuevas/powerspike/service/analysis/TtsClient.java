@@ -24,11 +24,14 @@ public class TtsClient {
 
     private final RestTemplate restTemplate;
     private final String apiKey;
+    private final boolean ttsEnabled;
 
     public TtsClient(RestTemplate restTemplate,
-                     @Value("${openai.api.key:}") String apiKey) {
+                     @Value("${openai.api.key:}") String apiKey,
+                     @Value("${openai.tts.enabled:true}") boolean ttsEnabled) {
         this.restTemplate = restTemplate;
         this.apiKey = apiKey;
+        this.ttsEnabled = ttsEnabled;
     }
 
     /**
@@ -98,6 +101,6 @@ public class TtsClient {
     }
 
     public boolean isConfigured() {
-        return apiKey != null && !apiKey.isBlank();
+        return ttsEnabled && apiKey != null && !apiKey.isBlank();
     }
 }

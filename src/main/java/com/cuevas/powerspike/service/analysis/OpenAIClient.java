@@ -37,6 +37,7 @@ public class OpenAIClient {
             - Para post-game, damé 3 áreas concretas de mejora
             - No seas condescendiente, tratá al jugador como alguien que quiere mejorar
             - No preguntes nada al final ni ofrezcas hacer otra cosa. Terminá con el último consejo y nada más.
+            - Interpretá las stats según el rol: support no necesita CS alto (el oro viene del item de support y asistencias), jungle se mide por objetivos y ganks, ADC y mid sí necesitan farmear.
             """;
 
     private final RestTemplate restTemplate;

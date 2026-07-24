@@ -33,107 +33,133 @@ public class PromptBuilder {
      * Pide: cómo jugar la línea, build, runas, tips específicos y debilidades enemigas.
      */
     public String buildChampSelectPrompt(AnalysisContext ctx) {
-        System.out.println(">>> [DEBUG PB-CS] === INICIO buildChampSelectPrompt ===");
-        System.out.println(">>> [DEBUG PB-CS] myChampion: " + ctx.myChampion());
-        System.out.println(">>> [DEBUG PB-CS] myRole: " + ctx.myRole());
-        System.out.println(">>> [DEBUG PB-CS] enemyChampion: " + ctx.enemyChampion());
-        System.out.println(">>> [DEBUG PB-CS] enemyRole: " + ctx.enemyRole());
-        System.out.println(">>> [DEBUG PB-CS] mySummonerName: " + ctx.mySummonerName());
-        System.out.println(">>> [DEBUG PB-CS] champSelect.myTeam.size: " + (ctx.champSelect() != null && ctx.champSelect().myTeam() != null ? ctx.champSelect().myTeam().size() : "null"));
-        System.out.println(">>> [DEBUG PB-CS] champSelect.theirTeam.size: " + (ctx.champSelect() != null && ctx.champSelect().theirTeam() != null ? ctx.champSelect().theirTeam().size() : "null"));
-        System.out.println(">>> [DEBUG PB-CS] champSelect.bans: " + ctx.champSelect().bans());
 
         LcuChampSelectDTO cs = ctx.champSelect();
         String myTeamStr = formatTeam(cs.myTeam());
         String enemyTeamStr = formatTeam(cs.theirTeam());
         String bansStr = formatBans(cs.bans());
 
-        System.out.println(">>> [DEBUG PB-CS] myTeamStr: " + myTeamStr);
-        System.out.println(">>> [DEBUG PB-CS] enemyTeamStr: " + enemyTeamStr);
-        System.out.println(">>> [DEBUG PB-CS] bansStr: " + bansStr);
-
         String formatted = """
-                Terminó el champ select.
+                Terminó el champ select. Los roles del equipo enemigo no están confirmados, así que vas a tener que deducirlos.
                 
-                Sos %s jugando %s.
-                Tu matchup en la línea es contra %s (%s).
+                Sos %s jugando %s (%s).
                 
-                Tu equipo: %s
-                Equipo enemigo: %s
+                Tu equipo (roles confirmados):
+                %s
+                
+                Equipo enemigo (campeones visibles, roles sin confirmar):
+                %s
+                
                 Baneos: %s
+                Patch: %s
                 
-                Analizá el matchup y damé:
-                1. Cómo jugar la línea (early/mid/late)
-                2. Build recomendada y por qué
-                3. Runas sugeridas
-                4. Tips específicos contra tu enemigo de línea
-                5. Debilidades de la composición enemiga
+                Primero, analizá los campeones enemigos y asignales el rol MÁS PROBABLE según el meta actual (patch %s).
                 
-                Sé conciso y práctico.
+                Después, con esa composición estimada, decime:
+                1. Quién es tu enemigo de línea más probable y cómo jugarle
+                2. Cómo jugar el early/mid/late según el matchup
+                3. Build recomendada para esta partida en general
+                4. Debilidades de la composición enemiga
+                5. Qué va a querer hacer el equipo enemigo (teamfight, split push, pickoffs)
+                
+                Sé conciso. Es un análisis especulativo, no tenés los roles confirmados.
                 """.formatted(
                 ctx.mySummonerName(),
                 ctx.myChampion(),
-                ctx.enemyChampion() != null ? ctx.enemyChampion() : "desconocido",
-                ctx.enemyRole() != null ? ctx.enemyRole() : "rol desconocido",
+                ctx.myRole() != null && !ctx.myRole().isEmpty() ? ctx.myRole() : "rol desconocido",
                 myTeamStr,
                 enemyTeamStr,
-                bansStr
+                bansStr,
+                dataDragonClient.getCurrentVersion(),
+                dataDragonClient.getCurrentVersion()
         );
-
-        System.out.println(">>> [DEBUG PB-CS] Prompt final:\n" + formatted);
 
         return formatted;
     }
 
     /**
-     * Arma el prompt para análisis de muerte.
-     * Incluye: minuto, campeón del jugador, stats, items, datos del killer,
-     * rol del jugador, fase de la partida, y eventos cercanos.
-     * Pide: UN consejo breve y accionable (máximo 3 líneas).
+     * Arma el prompt para análisis concreto de matchup cuando el Live Client conecta.
+     * A diferencia del champ select (especulativo), acá tenemos roles exactos de los 10 jugadores.
      */
-    public String buildDeathPrompt(AnalysisContext ctx, String myRole, String gamePhase, String nearbyEvents) {
-        System.out.println(">>> [DEBUG PB-DEATH] gameMinute: " + ctx.gameMinute());
-        System.out.println(">>> [DEBUG PB-DEATH] myChampion: " + ctx.myChampion());
-        System.out.println(">>> [DEBUG PB-DEATH] myRole: " + myRole);
-        System.out.println(">>> [DEBUG PB-DEATH] gamePhase: " + gamePhase);
-        System.out.println(">>> [DEBUG PB-DEATH] nearbyEvents: " + nearbyEvents);
-        System.out.println(">>> [DEBUG PB-DEATH] mySummonerName: " + ctx.mySummonerName());
-        System.out.println(">>> [DEBUG PB-DEATH] deathEvent.EventName: " + (ctx.deathEvent() != null ? ctx.deathEvent().EventName() : "null"));
-        System.out.println(">>> [DEBUG PB-DEATH] deathEvent.KillerName: " + (ctx.deathEvent() != null ? ctx.deathEvent().KillerName() : "null"));
-        System.out.println(">>> [DEBUG PB-DEATH] liveGameData.activePlayer: " + (ctx.liveGameData() != null && ctx.liveGameData().activePlayer() != null ? ctx.liveGameData().activePlayer().summonerName() : "null"));
+    public String buildLiveClientMatchupPrompt(LiveClientAllDataDTO data, 
+                                                LiveClientPlayerDTO myPlayer,
+                                                LiveClientPlayerDTO enemyPlayer) {
+        String myTeamComp = data.allPlayers().stream()
+                .filter(p -> p.team().equals(myPlayer.team()))
+                .map(p -> "%s (%s) [%s]".formatted(p.championName(), p.riotId(), p.position()))
+                .collect(java.util.stream.Collectors.joining(", "));
 
-        LiveClientAllDataDTO data = ctx.liveGameData();
+        String enemyTeamComp = data.allPlayers().stream()
+                .filter(p -> !p.team().equals(myPlayer.team()))
+                .map(p -> "%s (%s) [%s]".formatted(p.championName(), p.riotId(), p.position()))
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        if (enemyPlayer == null) {
+            return """
+                    Ya arrancó la partida.
+                    
+                    Sos %s jugando %s (%s).
+                    
+                    Tu equipo: %s
+                    Equipo enemigo: %s
+                    
+                    No se pudo determinar el enemigo directo de tu línea.
+                    Analizá la composición enemiga y damé consejos generales de cómo jugar esta partida.
+                    """.formatted(
+                    myPlayer.riotId(), myPlayer.championName(), myPlayer.position(),
+                    myTeamComp, enemyTeamComp
+            );
+        }
+
+        return """
+                Ya arrancó la partida. Estos son los datos reales del matchup.
+                
+                Sos %s jugando %s (%s).
+                Tu enemigo directo es %s (%s) jugando %s.
+                
+                Tu equipo: %s
+                Equipo enemigo: %s
+                
+                Con esta información concreta, analizá:
+                1. Cómo jugar contra %s en early (lvl 1-6), mid (lvl 6-11) y late (lvl 11+)
+                2. Items recomendados específicos contra este matchup (armadura? MR? heal cut?)
+                3. Cuándo tenés ventaja para tradear/pelear (power spikes, niveles clave)
+                4. Cuándo NO pelear (él tiene ventaja en early/mid/late)
+                5. Estrategia de línea: ¿pusheás, freezás, roameás?
+                6. Tips de posicionamiento y mecánica contra este campeón
+                
+                Sé específico, no genérico. Conocés el matchup exacto.
+                """.formatted(
+                myPlayer.riotId(), myPlayer.championName(), myPlayer.position(),
+                enemyPlayer.riotId(), enemyPlayer.championName(), enemyPlayer.position(),
+                myTeamComp, enemyTeamComp,
+                enemyPlayer.championName()
+        );
+    }
+
+    /**
+     * Arma el prompt para análisis de muerte con contexto rico.
+     * Incluye: zona del mapa, visión, tipo de pelea (1v1 vs gank), comparación con el killer.
+     */
+    public String buildDeathPrompt(LiveClientAllDataDTO data, LiveClientEventDTO death,
+                                    String myRole, String deathZone, boolean hasVision,
+                                    String fightType, String killerComparison, String assistersList) {
         LiveClientActivePlayerDTO ap = data.activePlayer();
-        LiveClientEventDTO death = ctx.deathEvent();
-
         LiveClientPlayerDTO myPlayer = findMyPlayer(data);
         LiveClientPlayerDTO killer = findKiller(data, death);
-
-        System.out.println(">>> [DEBUG PB-DEATH] myPlayer: " + (myPlayer != null ? myPlayer.summonerName() : "null"));
-        System.out.println(">>> [DEBUG PB-DEATH] killer: " + (killer != null ? killer.summonerName() : "null"));
 
         String myStats = formatPlayerStats(myPlayer);
         String killerStats = killer != null ? formatPlayerStats(killer) : "desconocido";
         String myItems = formatItems(myPlayer);
         String killerItems = killer != null ? formatItems(killer) : "desconocido";
-
         String killerName = death != null && death.KillerName() != null ? death.KillerName() : "desconocido";
-
-        // Determinar posición aproximada según rol
-        String positionHint = switch (myRole != null ? myRole.toLowerCase() : "") {
-            case "top" -> "top lane";
-            case "jungle" -> "jungla";
-            case "middle" -> "mid lane";
-            case "bottom" -> "bot lane";
-            case "utility" -> "bot lane (support)";
-            default -> "desconocida";
-        };
+        int minute = (int)(death.EventTime() / 60.0);
+        String visionText = hasVision ? "Habías colocado visión en la zona." : "NO tenías visión en la zona.";
 
         return """
-                Moriste en el minuto %d (%s).
+                Moriste en el minuto %d.
                 
                 Sos %s (%s) jugando %s.
-                Estabas en %s.
                 Tus stats: %s
                 Tus items: %s
                 
@@ -141,23 +167,30 @@ public class PromptBuilder {
                 Sus stats: %s
                 Sus items: %s
                 
-                Eventos cercanos (±30s): %s
+                Contexto:
+                - Zona: %s
+                - Tipo de pelea: %s
+                - Visión: %s
+                %s
+                %s
                 
-                Damé UN consejo breve y accionable sobre qué hacer diferente según tu rol y la fase de la partida. Máximo 3 líneas.
+                Damé UN consejo breve y accionable sobre qué hacer diferente según tu rol, la zona y la situación. Máximo 4 líneas.
                 """.formatted(
-                ctx.gameMinute(),
-                gamePhase,
+                minute,
                 ap.championName(),
                 myStats,
                 myRole != null ? myRole : "rol desconocido",
-                positionHint,
                 myStats,
                 myItems,
                 killerName,
                 killer != null ? killer.championName() : "desconocido",
                 killerStats,
                 killerItems,
-                nearbyEvents
+                deathZone,
+                fightType,
+                visionText,
+                killerComparison,
+                assistersList != null && !assistersList.isEmpty() ? assistersList : ""
         );
     }
 
@@ -251,37 +284,45 @@ public class PromptBuilder {
 
     /**
      * Formatea la composición de un equipo para el prompt.
-     * Formato: "Nombre#Tag (Campeón) [ROL]"
-     * Filtra bots (puuid vacío) y muestra solo el campeón si no hay nombre.
+     * Incluye campeones incluso si los datos del jugador no están disponibles (puuid vacío).
      */
     private String formatTeam(List<LcuTeamMemberDTO> team) {
         if (team == null || team.isEmpty()) return "N/A";
         
-        // Filtrar solo entradas completamente vacías (puuid vacío)
-        List<LcuTeamMemberDTO> realPlayers = team.stream()
-                .filter(m -> m.puuid() != null && !m.puuid().isEmpty())
+        // Separar jugadores con nombre vs sin nombre (enemigos sin datos)
+        List<LcuTeamMemberDTO> namedPlayers = team.stream()
+                .filter(m -> m.gameName() != null && !m.gameName().isEmpty() && !m.gameName().equals("#"))
                 .collect(Collectors.toList());
         
-        if (realPlayers.isEmpty()) {
-            return "Equipo de bots (practice tool)";
+        List<LcuTeamMemberDTO> champOnlyPlayers = team.stream()
+                .filter(m -> m.gameName() == null || m.gameName().isEmpty() || m.gameName().equals("#"))
+                .filter(m -> m.championId() > 0 || m.championPickIntent() > 0)
+                .collect(Collectors.toList());
+        
+        StringBuilder sb = new StringBuilder();
+        
+        // Jugadores con nombre
+        for (LcuTeamMemberDTO m : namedPlayers) {
+            if (!sb.isEmpty()) sb.append(", ");
+            String name = m.gameName() + "#" + m.tagLine();
+            String champ = m.championId() > 0 ? dataDragonClient.getChampionName(m.championId()) : "Sin pick";
+            String pos = m.assignedPosition() != null && !m.assignedPosition().isEmpty() ? "[" + m.assignedPosition() + "]" : "";
+            sb.append("%s (%s) %s".formatted(name, champ != null ? champ : "?", pos));
         }
         
-        return realPlayers.stream()
-                .map(m -> {
-                    String name = (m.gameName() != null && !m.gameName().isEmpty() && !m.gameName().equals("#"))
-                            ? m.gameName() + "#" + m.tagLine() : null;
-                    String champ = m.championId() > 0
-                            ? dataDragonClient.getChampionName(m.championId()) 
-                            : (m.championPickIntent() > 0 
-                                ? dataDragonClient.getChampionName(m.championPickIntent()) + " (hover)"
-                                : "Sin pick");
-                    String pos = m.assignedPosition() != null && !m.assignedPosition().isEmpty() ? "[" + m.assignedPosition() + "]" : "";
-                    if (name != null) {
-                        return "%s (%s) %s".formatted(name, champ != null ? champ : "?", pos);
-                    }
-                    return "%s %s".formatted(champ != null ? champ : "?", pos);
-                })
-                .collect(Collectors.joining(", "));
+        // Campeones sin nombre (enemigos)
+        if (!champOnlyPlayers.isEmpty()) {
+            if (!sb.isEmpty()) sb.append(" | Enemigos: ");
+            for (LcuTeamMemberDTO m : champOnlyPlayers) {
+                int champId = m.championId() > 0 ? m.championId() : m.championPickIntent();
+                String champ = dataDragonClient.getChampionName(champId);
+                sb.append(champ != null ? champ : "Champion " + champId).append(", ");
+            }
+            // Sacar la última coma
+            sb.setLength(sb.length() - 2);
+        }
+        
+        return !sb.isEmpty() ? sb.toString() : "N/A";
     }
 
     /**

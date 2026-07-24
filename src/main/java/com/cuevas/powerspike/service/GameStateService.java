@@ -19,6 +19,8 @@ public class GameStateService {
     private final StringProperty myRole = new SimpleStringProperty("");
     private final StringProperty myGameName = new SimpleStringProperty("");
     private final StringProperty myTagLine = new SimpleStringProperty("");
+    private final StringProperty myEnemyChampion = new SimpleStringProperty("");
+    private final StringProperty myEnemyName = new SimpleStringProperty("");
 
     public void setMyPuuid(String puuid) {
         Platform.runLater(() -> myPuuid.set(puuid != null ? puuid : ""));
@@ -33,6 +35,14 @@ public class GameStateService {
             myGameName.set(gameName != null ? gameName : "");
             myTagLine.set(tagLine != null ? tagLine : "");
         });
+    }
+
+    public void setMyEnemyChampion(String champ) {
+        Platform.runLater(() -> myEnemyChampion.set(champ != null ? champ : ""));
+    }
+
+    public void setMyEnemyName(String name) {
+        Platform.runLater(() -> myEnemyName.set(name != null ? name : ""));
     }
 
     public void updatePhase(String phase) {
@@ -82,6 +92,8 @@ public class GameStateService {
     public String getMyGameName() { return myGameName.get(); }
     public String getMyTagLine() { return myTagLine.get(); }
     public String getActivePlayerName() { return activePlayerName.get(); }
+    public String getMyEnemyChampion() { return myEnemyChampion.get(); }
+    public String getMyEnemyName() { return myEnemyName.get(); }
 
     public String getGamePhase() { return gamePhase.get(); }
     public LcuChampSelectDTO getChampSelect() { return champSelect.get(); }
