@@ -1,12 +1,16 @@
 package com.cuevas.powerspike.service;
 
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
 @Service
 public class LcuLockfile {
+
+    private static final Logger log = LoggerFactory.getLogger(LcuLockfile.class);
 
     private int port;
     private String token;
@@ -46,7 +50,7 @@ public class LcuLockfile {
 
             if (found) {
                 if (!connected) {
-                    System.out.println(">>> LCU detectado en puerto " + port);
+                    log.info("LCU detectado en puerto {}", port);
                 }
                 connected = true;
             } else {

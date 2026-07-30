@@ -1,6 +1,8 @@
 package com.cuevas.powerspike.service.analysis;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,6 +19,8 @@ import java.util.Map;
  */
 @Service
 public class TtsClient {
+
+    private static final Logger log = LoggerFactory.getLogger(TtsClient.class);
 
     private static final String API_URL = "https://api.openai.com/v1/audio/speech";
     private static final String MODEL = "gpt-4o-mini-tts";
@@ -65,7 +69,7 @@ public class TtsClient {
                 playAudio(audioData);
             }
         } catch (Exception e) {
-            System.out.println(">>> [TTS] Error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            log.error("TTS Error: {} - {}", e.getClass().getSimpleName(), e.getMessage());
         }
     }
 
@@ -95,7 +99,7 @@ public class TtsClient {
                 
                 mediaPlayer.play();
             } catch (Exception e) {
-                System.out.println(">>> [TTS] Error reproduciendo audio: " + e.getMessage());
+                log.error("TTS Error reproduciendo audio: {}", e.getMessage());
             }
         });
     }

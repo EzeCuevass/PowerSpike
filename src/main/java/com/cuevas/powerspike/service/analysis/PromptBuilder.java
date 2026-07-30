@@ -63,6 +63,7 @@ public class PromptBuilder {
                 5. Qué va a querer hacer el equipo enemigo (teamfight, split push, pickoffs)
                 
                 Sé conciso. Es un análisis especulativo, no tenés los roles confirmados.
+                Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 ctx.mySummonerName(),
                 ctx.myChampion(),
@@ -75,6 +76,41 @@ public class PromptBuilder {
         );
 
         return formatted;
+    }
+
+    /**
+     * Análisis desde LiveClient cuando la app no tiene datos de LCU (inicio tardío).
+     */
+    public String buildChampSelectFromLiveClient(LiveClientAllDataDTO data, LiveClientPlayerDTO myPlayer) {
+        String myTeam = data.allPlayers().stream()
+                .filter(p -> p.team().equals(myPlayer.team()))
+                .map(p -> "%s (%s) [%s]".formatted(p.championName(), p.riotId(), p.position()))
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        String enemyTeam = data.allPlayers().stream()
+                .filter(p -> !p.team().equals(myPlayer.team()))
+                .map(p -> "%s (%s) [%s]".formatted(p.championName(), p.riotId(), p.position()))
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        return """
+                Estás en partida. Estos son los datos reales de la composición.
+                
+                Sos %s jugando %s (%s).
+                
+                Tu equipo: %s
+                Equipo enemigo: %s
+                
+                Analizá:
+                1. Quién es tu enemigo directo y cómo jugarle
+                2. Fortalezas y debilidades de la composición enemiga
+                3. Estrategia recomendada para esta partida
+                
+                Sé conciso.
+                Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
+                """.formatted(
+                myPlayer.riotId(), myPlayer.championName(), myPlayer.position(),
+                myTeam, enemyTeam
+        );
     }
 
     /**
@@ -129,6 +165,7 @@ public class PromptBuilder {
                 6. Tips de posicionamiento y mecánica contra este campeón
                 
                 Sé específico, no genérico. Conocés el matchup exacto.
+                Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 myPlayer.riotId(), myPlayer.championName(), myPlayer.position(),
                 enemyPlayer.riotId(), enemyPlayer.championName(), enemyPlayer.position(),
@@ -142,7 +179,7 @@ public class PromptBuilder {
      * Incluye: zona del mapa, visión, tipo de pelea (1v1 vs gank), comparación con el killer.
      */
     public String buildDeathPrompt(LiveClientAllDataDTO data, LiveClientEventDTO death,
-                                    String myRole, String deathZone, boolean hasVision,
+                                    String myRole, String deathZone, String visionText,
                                     String fightType, String killerComparison, String assistersList) {
         LiveClientActivePlayerDTO ap = data.activePlayer();
         LiveClientPlayerDTO myPlayer = findMyPlayer(data);
@@ -154,7 +191,6 @@ public class PromptBuilder {
         String killerItems = killer != null ? formatItems(killer) : "desconocido";
         String killerName = death != null && death.KillerName() != null ? death.KillerName() : "desconocido";
         int minute = (int)(death.EventTime() / 60.0);
-        String visionText = hasVision ? "Habías colocado visión en la zona." : "NO tenías visión en la zona.";
 
         return """
                 Moriste en el minuto %d.
@@ -174,7 +210,19 @@ public class PromptBuilder {
                 %s
                 %s
                 
-                Damé UN consejo breve y accionable sobre qué hacer diferente según tu rol, la zona y la situación. Máximo 4 líneas.
+                Analizá la captura de LoL como un coach en tiempo real.
+                Usá internamente este análisis para darme UN consejo accionable.
+                No imprimas el análisis, solo la conclusión.
+                
+                Tu análisis interno (no lo imprimas):
+                - Lado del mapa: blue / red / no determinable
+                - Ubicación: zona exacta (top, bot, río, jungla, blue buff, etc.)
+                - Visión: wards aliadas o enemigas visibles
+                - ¿Aliados o enemigos cerca?
+                - Cooldowns disponibles o gastados
+                - ¿Era evitable? ¿Por qué?
+                
+                Al final, damé solo UN consejo concreto y breve basado en TODO (texto + captura). Máximo 3 líneas.
                 """.formatted(
                 minute,
                 ap.championName(),
@@ -200,19 +248,11 @@ public class PromptBuilder {
      * Pide: resumen, qué hizo bien, 3 áreas de mejora y qué practicar.
      */
     public String buildGameEndPrompt(AnalysisContext ctx) {
-        System.out.println(">>> [DEBUG PB-END] myChampion: " + ctx.myChampion());
-        System.out.println(">>> [DEBUG PB-END] mySummonerName: " + ctx.mySummonerName());
-        System.out.println(">>> [DEBUG PB-END] liveGameData: " + (ctx.liveGameData() != null ? "presente" : "null"));
-
         LiveClientAllDataDTO data = ctx.liveGameData();
         if (data == null) return "No hay datos de la partida disponibles.";
 
         LiveClientActivePlayerDTO ap = data.activePlayer();
         LiveClientPlayerDTO myPlayer = findMyPlayer(data);
-
-        System.out.println(">>> [DEBUG PB-END] activePlayer: " + (ap != null ? ap.summonerName() : "null"));
-        System.out.println(">>> [DEBUG PB-END] myPlayer: " + (myPlayer != null ? myPlayer.summonerName() : "null"));
-        System.out.println(">>> [DEBUG PB-END] allPlayers.size: " + data.allPlayers().size());
 
         String allPlayersStr = data.allPlayers().stream()
                 .map(p -> "%s (%s) [%s] - %d/%d/%d, %d CS"
@@ -245,11 +285,6 @@ public class PromptBuilder {
                 .filter(p -> "CHAOS".equals(p.team()))
                 .mapToInt(p -> p.scores() != null ? p.scores().kills() : 0).sum();
 
-        System.out.println(">>> [DEBUG PB-END] gameMinutes: " + gameMinutes);
-        System.out.println(">>> [DEBUG PB-END] totalKillsBlue: " + totalKillsBlue);
-        System.out.println(">>> [DEBUG PB-END] totalKillsRed: " + totalKillsRed);
-        System.out.println(">>> [DEBUG PB-END] allPlayersStr:\n" + allPlayersStr);
-
         return """
                 La partida terminó (%.1f minutos).
                 
@@ -270,6 +305,7 @@ public class PromptBuilder {
                 5. Qué debería practicar para la próxima
                 
                 Sé honesto y constructivo.
+                Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 gameMinutes,
                 ctx.mySummonerName(),

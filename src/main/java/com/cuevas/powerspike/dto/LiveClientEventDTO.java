@@ -9,5 +9,5 @@ public record LiveClientEventDTO(
         String KillerName,
         String VictimName,
         List<String> Assisters,
-        LiveClientPositionDTO position
+        LiveClientPositionDTO Position
 ) {}

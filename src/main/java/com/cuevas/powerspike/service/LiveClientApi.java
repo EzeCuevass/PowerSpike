@@ -20,6 +20,15 @@ public class LiveClientApi {
         return liveClientRestTemplate.getForObject(url, LiveClientAllDataDTO.class);
     }
 
+    public String getRawEventsJson() {
+        try {
+            String url = "https://127.0.0.1:2999/liveclientdata/eventdata";
+            return liveClientRestTemplate.getForObject(url, String.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public List<LiveClientEventDTO> getEvents() {
         String url = "https://127.0.0.1:2999/liveclientdata/eventdata";
         LiveClientEventsDTO events = liveClientRestTemplate.getForObject(url, LiveClientEventsDTO.class);

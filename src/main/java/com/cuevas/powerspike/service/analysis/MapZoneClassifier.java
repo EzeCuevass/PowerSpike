@@ -90,17 +90,17 @@ public class MapZoneClassifier {
         for (LiveClientEventDTO e : events.Events()) {
             if (e.EventTime() < cutOff || e.EventTime() > deathTime) continue;
 
-            if ("WARD_PLACED".equals(e.EventName()) && e.position() != null) {
-                if (dist(e.position(), deathPos) < 2500) {
+            if ("WARD_PLACED".equals(e.EventName()) && e.Position() != null) {
+                if (dist(e.Position(), deathPos) < 2500) {
                     wardPlaced = true;
                     wardPlacedTime = e.EventTime();
                 }
             }
 
             // Si la ward fue destruida después de ser puesta, ya no sirve
-            if ("WARD_KILL".equals(e.EventName()) && e.position() != null) {
+            if ("WARD_KILL".equals(e.EventName()) && e.Position() != null) {
                 if (wardPlaced && e.EventTime() > wardPlacedTime
-                        && dist(e.position(), deathPos) < 2500) {
+                        && dist(e.Position(), deathPos) < 2500) {
                     wardPlaced = false;
                 }
             }

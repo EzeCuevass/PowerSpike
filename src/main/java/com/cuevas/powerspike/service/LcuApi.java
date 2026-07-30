@@ -1,6 +1,8 @@
 package com.cuevas.powerspike.service;
 
 import com.cuevas.powerspike.dto.LcuChampSelectDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -12,6 +14,8 @@ import org.springframework.web.client.RestTemplate;
 
 @Service
 public class LcuApi {
+
+    private static final Logger log = LoggerFactory.getLogger(LcuApi.class);
 
     private final RestTemplate lcuRestTemplate;
     private final LcuLockfile lcuLockfile;
@@ -92,7 +96,7 @@ public class LcuApi {
             }
             return phase;
         } catch (Exception e) {
-            System.out.println(">>> LCU getPhase error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            log.error("LCU getPhase error: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             return null;
         }
     }

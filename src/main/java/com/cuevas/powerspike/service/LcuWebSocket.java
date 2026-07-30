@@ -52,9 +52,9 @@ public class LcuWebSocket {
             client = new WebSocketClient(uri) {
                 @Override
                 public void onOpen(ServerHandshake handshake) {
-                    System.out.println(">>> [WS] Conectado a wss://127.0.0.1:" + port + "/");
+
                     send("[5, \"OnJsonApiEvent\"]");
-                    System.out.println(">>> [WS] Suscrito a TODOS los eventos del cliente");
+
                     reconnectAttempts = 0;
                 }
 
@@ -65,10 +65,10 @@ public class LcuWebSocket {
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
-                    System.out.println(">>> [WS] Desconectado. Código: " + code + " Razón: " + reason);
+
                     if (!shouldStop && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                         reconnectAttempts++;
-                        System.out.println(">>> [WS] Reintentando (" + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS + ")...");
+
                         try {
                             Thread.sleep(RECONNECT_DELAY_MS);
                             connectToLCU();
@@ -78,7 +78,7 @@ public class LcuWebSocket {
 
                 @Override
                 public void onError(Exception ex) {
-                    System.out.println(">>> [WS] Error: " + ex.getMessage());
+
                 }
             };
 
@@ -87,7 +87,7 @@ public class LcuWebSocket {
             client.connectBlocking();
 
         } catch (Exception e) {
-            System.out.println(">>> [WS] Error conectando: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+
         }
     }
 
@@ -108,54 +108,54 @@ public class LcuWebSocket {
             LcuChampSelectDTO session = eventData.data();
             LcuChampSelectDTO previous = lcuApi.getCurrentChampSelect();
 
-            System.out.println(">>> [WS] Evento: " + eventData.eventType());
+
 
             // No actualizar si el evento es Delete (champ select terminó) o si los equipos están vacíos
             // Esto preserva el último champ select válido para el análisis post-game
             if ("Delete".equals(eventData.eventType())) {
-                System.out.println(">>> [WS] Evento Delete ignorado, manteniendo último champ select válido");
+
                 return;
             }
 
             if (session.myTeam() == null || session.myTeam().isEmpty()) {
-                System.out.println(">>> [WS] Equipos vacíos, ignorando evento");
+
                 return;
             }
 
             if (session.timer() != null) {
                 long secs = session.timer().adjustedTimeLeftInPhase() / 1000;
-                System.out.println(">>> [WS] Timer: " + session.timer().phase() + " - " + secs + "s restantes");
+
             }
 
             for (LcuTeamMemberDTO m : session.myTeam()) {
                 String name = m.gameName() + "#" + m.tagLine();
                 if (m.championId() > 0) {
-                    System.out.println(">>> [WS] " + name + " pickeó " + lcuApi.getChampionName(m.championId()));
+
                 }
                 if (m.championPickIntent() > 0 && (previous == null || !hasPickIntent(previous.myTeam(), m.cellId(), m.championPickIntent()))) {
-                    System.out.println(">>> [WS] " + name + " está hovereando " + lcuApi.getChampionName(m.championPickIntent()));
+
                 }
             }
 
             for (LcuTeamMemberDTO m : session.theirTeam()) {
                 String name = m.gameName() + "#" + m.tagLine();
                 if (m.championId() > 0) {
-                    System.out.println(">>> [WS] " + name + " pickeó " + lcuApi.getChampionName(m.championId()));
+
                 }
                 if (m.championPickIntent() > 0 && (previous == null || !hasPickIntent(previous.theirTeam(), m.cellId(), m.championPickIntent()))) {
-                    System.out.println(">>> [WS] " + name + " está hovereando " + lcuApi.getChampionName(m.championPickIntent()));
+
                 }
             }
 
             if (session.bans() != null) {
                 for (LcuBanDTO b : session.bans().myTeamBans()) {
                     if (previous == null || !hasBan(previous.bans().myTeamBans(), b.championId())) {
-                        System.out.println(">>> [WS] Equipo azul baneó a " + lcuApi.getChampionName(b.championId()));
+
                     }
                 }
                 for (LcuBanDTO b : session.bans().theirTeamBans()) {
                     if (previous == null || !hasBan(previous.bans().theirTeamBans(), b.championId())) {
-                        System.out.println(">>> [WS] Equipo rojo baneó a " + lcuApi.getChampionName(b.championId()));
+
                     }
                 }
             }
@@ -163,7 +163,7 @@ public class LcuWebSocket {
             lcuApi.updateChampSelect(session);
 
         } catch (Exception e) {
-            System.out.println(">>> [WS] Error parseando: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+
         }
     }
 

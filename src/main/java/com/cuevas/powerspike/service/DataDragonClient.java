@@ -2,6 +2,8 @@ package com.cuevas.powerspike.service;
 
 import com.cuevas.powerspike.dto.ChampionData;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
@@ -9,6 +11,8 @@ import java.util.Map;
 
 @Service
 public class DataDragonClient {
+
+    private static final Logger log = LoggerFactory.getLogger(DataDragonClient.class);
 
     private final Map<Long, String> championMap = new HashMap<>();
     private final RestTemplate restTemplate;
@@ -27,10 +31,10 @@ public class DataDragonClient {
                 currentVersion = versions[0];
             }
         } catch (Exception e) {
-            System.out.println(">>> [DataDragon] No se pudo obtener versión, usando " + currentVersion);
+            log.warn("No se pudo obtener versión, usando {}", currentVersion);
         }
 
-        System.out.println(">>> [DataDragon] Cargando campeones versión " + currentVersion);
+        log.info("Cargando campeones versión {}", currentVersion);
         String url = "https://ddragon.leagueoflegends.com/cdn/" + currentVersion + "/data/en_US/champion.json";
         ChampionData response = restTemplate.getForObject(url, ChampionData.class);
 

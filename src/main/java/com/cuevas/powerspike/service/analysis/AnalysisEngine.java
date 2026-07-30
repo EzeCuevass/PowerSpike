@@ -3,6 +3,7 @@ package com.cuevas.powerspike.service.analysis;
 import com.cuevas.powerspike.dto.*;
 import com.cuevas.powerspike.service.DataDragonClient;
 import com.cuevas.powerspike.service.GameStateService;
+import com.cuevas.powerspike.service.LiveClientApi;
 import jakarta.annotation.PostConstruct;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
@@ -32,6 +33,8 @@ public class AnalysisEngine {
     private final OpenAIClient openAIClient;
     private final TtsClient ttsClient;
     private final DataDragonClient dataDragonClient;
+    private final LiveClientApi liveClientApi;
+    private final ScreenshotService screenshotService;
 
     // Hilo único para análisis secuenciales (evita race conditions con el cooldown)
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -49,12 +52,16 @@ public class AnalysisEngine {
                           PromptBuilder promptBuilder,
                           OpenAIClient openAIClient,
                           TtsClient ttsClient,
-                          DataDragonClient dataDragonClient) {
+                          DataDragonClient dataDragonClient,
+                          LiveClientApi liveClientApi,
+                          ScreenshotService screenshotService) {
         this.gameStateService = gameStateService;
         this.promptBuilder = promptBuilder;
         this.openAIClient = openAIClient;
         this.ttsClient = ttsClient;
         this.dataDragonClient = dataDragonClient;
+        this.liveClientApi = liveClientApi;
+        this.screenshotService = screenshotService;
     }
 
     /**
@@ -88,15 +95,33 @@ public class AnalysisEngine {
         if (newPhase == null) newPhase = "CLOSED";
 
         if ("ChampSelect".equals(oldPhase) && !"ChampSelect".equals(newPhase)) {
-            LcuChampSelectDTO cs = gameStateService.getChampSelect();
-            if (cs != null) {
-                triggerChampSelectAnalysis(cs);
+            // Champ select analysis deshabilitado
+        }
+
+        // Si la fase entra en InProgress y el champ select no se detectó (app iniciada tarde),
+        // disparar el análisis especulativo con los datos del LiveClient
+        // Deshabilitado
+        /*
+        if ("InProgress".equals(newPhase) && !"InProgress".equals(oldPhase)) {
+            LiveClientAllDataDTO liveData = gameStateService.getLiveGameData();
+            if (liveData != null && liveData.allPlayers() != null && liveData.allPlayers().size() == 10) {
+                LcuChampSelectDTO cs = gameStateService.getChampSelect();
+                if (cs == null) {
+                    triggerChampSelectAnalysis(liveData);
+                }
             }
         }
+        */
 
         if ("InProgress".equals(oldPhase) && !"InProgress".equals(newPhase)) {
             LiveClientAllDataDTO liveData = gameStateService.getLiveGameData();
-            if (liveData != null) {
+            // Si el LiveClient ya se desconectó, intentar obtener los últimos datos directamente
+            if (liveData == null || liveData.activePlayer() == null) {
+                try {
+                    liveData = liveClientApi.getAllGameData();
+                } catch (Exception ignored) {}
+            }
+            if (liveData != null && liveData.activePlayer() != null) {
                 triggerGameEndAnalysis(liveData);
             }
         }
@@ -152,41 +177,12 @@ public class AnalysisEngine {
     private void triggerChampSelectAnalysis(LcuChampSelectDTO cs) {
         if (!openAIClient.isConfigured()) return;
 
-        System.out.println(">>> [DEBUG CS] === INICIO triggerChampSelectAnalysis ===");
-        System.out.println(">>> [DEBUG CS] cs.myTeam.size: " + (cs.myTeam() != null ? cs.myTeam().size() : "null"));
-        System.out.println(">>> [DEBUG CS] cs.theirTeam.size: " + (cs.theirTeam() != null ? cs.theirTeam().size() : "null"));
-        System.out.println(">>> [DEBUG CS] cs.bans: " + cs.bans());
-
         // Usar el nombre guardado del invocador, no el del LiveClient (no existe en champ select)
         String myGameName = gameStateService.getMyGameName();
         String myTagLine = gameStateService.getMyTagLine();
         String myName = (myGameName != null && !myGameName.isEmpty())
                 ? myGameName + "#" + myTagLine
                 : "Jugador";
-
-        String myPuuid = gameStateService.getMyPuuid();
-        System.out.println(">>> [DEBUG CS] Mi puuid guardado: '" + myPuuid + "'");
-        System.out.println(">>> [DEBUG CS] Mi nombre (live): " + myName);
-
-        // DEBUG: Mostrar datos crudos del champ select
-        System.out.println(">>> [DEBUG CS RAW] myTeam completo:");
-        if (cs.myTeam() != null) {
-            for (LcuTeamMemberDTO m : cs.myTeam()) {
-                System.out.println(">>> [DEBUG CS RAW]   puuid='" + m.puuid() + "' champId=" + m.championId()
-                        + " pickIntent=" + m.championPickIntent() + " pos=" + m.assignedPosition()
-                        + " name=" + m.gameName() + "#" + m.tagLine()
-                        + " summonerId=" + m.summonerId());
-            }
-        }
-        System.out.println(">>> [DEBUG CS RAW] theirTeam completo:");
-        if (cs.theirTeam() != null) {
-            for (LcuTeamMemberDTO m : cs.theirTeam()) {
-                System.out.println(">>> [DEBUG CS RAW]   puuid='" + m.puuid() + "' champId=" + m.championId()
-                        + " pickIntent=" + m.championPickIntent() + " pos=" + m.assignedPosition()
-                        + " name=" + m.gameName() + "#" + m.tagLine()
-                        + " summonerId=" + m.summonerId());
-            }
-        }
 
         String myChamp = findMyChampion(cs);
         String myRole = findMyRole(cs);
@@ -196,17 +192,37 @@ public class AnalysisEngine {
         // Guardar el rol para usarlo en análisis posteriores (muertes, post-game)
         gameStateService.setMyRole(myRole);
 
-        System.out.println(">>> [DEBUG CS] Mi campeón: " + myChamp);
-        System.out.println(">>> [DEBUG CS] Mi rol: " + myRole);
-        System.out.println(">>> [DEBUG CS] Enemigo: " + enemyChamp);
-        System.out.println(">>> [DEBUG CS] Rol enemigo: " + enemyRole);
-
         AnalysisContext ctx = AnalysisContext.champSelect(cs, myChamp, myRole, enemyChamp, enemyRole, myName);
         String prompt = promptBuilder.buildChampSelectPrompt(ctx);
-        System.out.println(">>> [DEBUG CS] Prompt:\n" + prompt);
-        System.out.println(">>> [DEBUG CS] --- FIN PROMPT ---");
 
         runAnalysis(ctx, prompt);
+    }
+
+    /**
+     * Análisis de champ select desde LiveClient (cuando la app se inició tarde y no hay datos de LCU).
+     */
+    private void triggerChampSelectAnalysis(LiveClientAllDataDTO data) {
+        if (!openAIClient.isConfigured()) return;
+
+        String myName = data.activePlayer().summonerName();
+        String myBaseName = myName.contains("#") ? myName.substring(0, myName.indexOf("#")) : myName;
+
+        LiveClientPlayerDTO myPlayer = null;
+        for (LiveClientPlayerDTO p : data.allPlayers()) {
+            if (p.summonerName() != null && (p.summonerName().equals(myName) || p.summonerName().equals(myBaseName))) {
+                myPlayer = p; break;
+            }
+            if (p.riotId() != null && (p.riotId().equals(myName) || p.riotId().contains(myBaseName))) {
+                myPlayer = p; break;
+            }
+            if (p.championName() != null && p.championName().equals(data.activePlayer().championName())) {
+                myPlayer = p; break;
+            }
+        }
+        if (myPlayer == null) return;
+
+        String prompt = promptBuilder.buildChampSelectFromLiveClient(data, myPlayer);
+        runAnalysis(AnalysisTrigger.CHAMP_SELECT_END, prompt);
     }
 
     /**
@@ -233,14 +249,25 @@ public class AnalysisEngine {
                     (p.summonerName().equals(deathEvent.KillerName()) || p.championName().equals(deathEvent.KillerName())))
                 .findFirst().orElse(null);
 
-        // Clasificar zona de muerte
-        String deathZone = "desconocida";
+        // Visión: si no hay coordenadas, revisar si se colocaron wards recientemente
         boolean hasVision = false;
-        if (deathEvent.position() != null) {
+        String deathZone = "desconocida";
+        String visionText;
+        if (deathEvent.Position() != null) {
             MapZoneClassifier.Zone zone = MapZoneClassifier.classify(
-                    deathEvent.position().x(), deathEvent.position().y(), myTeam);
+                    deathEvent.Position().x(), deathEvent.Position().y(), myTeam);
             deathZone = zone.label;
-            hasVision = MapZoneClassifier.hasNearbyVision(data.events(), deathEvent.EventTime(), deathEvent.position());
+            hasVision = MapZoneClassifier.hasNearbyVision(data.events(), deathEvent.EventTime(), deathEvent.Position());
+        }
+        
+        // Fallback de visión sin posición: ¿wardeó el jugador en los últimos 2 min?
+        int recentWards = countRecentWards(data.events(), deathEvent.EventTime());
+        if (hasVision) {
+            visionText = "Habías colocado visión en la zona.";
+        } else if (recentWards > 0) {
+            visionText = "Colocaste " + recentWards + " ward(s) recientemente pero no se sabe si cubrían esta zona.";
+        } else {
+            visionText = "NO wardaste en los últimos 2 minutos. Probablemente estabas sin visión.";
         }
 
         // Contexto de asistentes: 1v1 vs gank
@@ -268,10 +295,51 @@ public class AnalysisEngine {
         }
 
         String prompt = promptBuilder.buildDeathPrompt(data, deathEvent, myRole, deathZone, 
-                hasVision, fightType, killerComparison, assistersList);
+                visionText, fightType, killerComparison, assistersList);
         
         AnalysisContext ctx = AnalysisContext.death(data, deathEvent, myChamp, myName, minute);
-        runAnalysis(ctx, prompt);
+        runDeathAnalysisWithScreenshot(ctx, prompt);
+    }
+
+    /**
+     * Ejecuta análisis de muerte con screenshot para análisis visual.
+     */
+    private void runDeathAnalysisWithScreenshot(AnalysisContext ctx, String prompt) {
+        executor.submit(() -> {
+            lastAnalysisTime = System.currentTimeMillis();
+
+            String screenshot = screenshotService.captureScreenAsBase64();
+            
+            String response;
+            if (screenshot != null) {
+                response = openAIClient.chatWithImage(prompt, screenshot);
+            } else {
+                response = openAIClient.chat(prompt);
+            }
+
+
+            AnalysisResult result = AnalysisResult.success(ctx.trigger(), prompt, response);
+            Platform.runLater(() -> latestResult.set(result));
+
+            if (ttsClient.isConfigured() && response != null && !response.startsWith("[Error]")) {
+                ttsClient.speak(response, "Speak in a friendly and encouraging tone, like a coach giving advice.");
+            }
+        });
+    }
+
+    /**
+     * Cuenta wards colocadas por el jugador en los últimos 2 minutos.
+     */
+    private int countRecentWards(LiveClientEventsDTO events, double deathTime) {
+        if (events == null || events.Events() == null) return 0;
+        int count = 0;
+        for (LiveClientEventDTO e : events.Events()) {
+            if (e.EventTime() > deathTime - 120 && e.EventTime() <= deathTime
+                    && "WARD_PLACED".equals(e.EventName())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
@@ -303,12 +371,24 @@ public class AnalysisEngine {
 
         String myName = data.activePlayer().summonerName();
 
-        // Buscar mi jugador y el enemigo de la misma línea
-        LiveClientPlayerDTO myPlayer = data.allPlayers().stream()
-                .filter(p -> p.summonerName().equals(myName) || p.championName().equals(data.activePlayer().championName()))
-                .findFirst().orElse(null);
+        // Buscar mi jugador con múltiples estrategias de matching
+        LiveClientPlayerDTO myPlayer = null;
+        String myBaseName = myName.contains("#") ? myName.substring(0, myName.indexOf("#")) : myName;
+        for (LiveClientPlayerDTO p : data.allPlayers()) {
+            if (p.summonerName() != null && (p.summonerName().equals(myName) || p.summonerName().equals(myBaseName))) {
+                myPlayer = p; break;
+            }
+            if (p.riotId() != null && (p.riotId().equals(myName) || p.riotId().contains(myBaseName))) {
+                myPlayer = p; break;
+            }
+            if (p.championName() != null && p.championName().equals(data.activePlayer().championName())) {
+                myPlayer = p; break;
+            }
+        }
 
-        if (myPlayer == null) return;
+        if (myPlayer == null) {
+            return;
+        }
 
         String myRole = myPlayer.position();
         String myTeam = myPlayer.team();
