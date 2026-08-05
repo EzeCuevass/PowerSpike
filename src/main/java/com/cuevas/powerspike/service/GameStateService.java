@@ -2,6 +2,9 @@ package com.cuevas.powerspike.service;
 
 import com.cuevas.powerspike.dto.LcuChampSelectDTO;
 import com.cuevas.powerspike.dto.LiveClientAllDataDTO;
+import com.cuevas.powerspike.model.ActiveSession;
+import com.cuevas.powerspike.repository.ActiveSessionRepository;
+import jakarta.annotation.PostConstruct;
 import javafx.application.Platform;
 import javafx.beans.property.*;
 import org.springframework.stereotype.Service;
@@ -21,7 +24,62 @@ public class GameStateService {
     private final StringProperty myTagLine = new SimpleStringProperty("");
     private final StringProperty myEnemyChampion = new SimpleStringProperty("");
     private final StringProperty myEnemyName = new SimpleStringProperty("");
+    private final LongProperty profileIconId = new SimpleLongProperty(0);
+    private final LongProperty summonerLevel = new SimpleLongProperty(0);
 
+    private final ActiveSessionRepository sessionRepository;
+
+    public GameStateService(ActiveSessionRepository sessionRepository) {
+        this.sessionRepository = sessionRepository;
+    }
+
+    /**
+     * Se ejecuta cuando Spring crea el bean (una vez, al arrancar la app).
+     * Busca la sesión guardada en H2 y la restaura en las properties.
+     * NO usa Platform.runLater porque acá todavía no está corriendo el FX thread,
+     * y además no hay listeners pendientes que dependan de este momento exacto.
+     */
+    @PostConstruct
+    public void restoreSession() {
+        sessionRepository.findById(1L).ifPresent(s -> {
+            myPuuid.set(s.getPuuid());
+            myGameName.set(s.getGameName());
+            myTagLine.set(s.getTagLine());
+            profileIconId.set(s.getProfileIconId() != null ? s.getProfileIconId() : 0);
+            summonerLevel.set(s.getSummonerLevel() != null ? s.getSummonerLevel() : 0);
+        });
+    }
+
+    /**
+     * Guarda la sesión activa en H2 (persiste entre reinicios).
+     * Se llama desde el FX thread (MainController), por eso no necesita runLater.
+     * Usa id=1L siempre, así sobreescribe la sesión anterior.
+     */
+    public void saveSession(String puuid, String gameName, String tagLine, Long profileIconId, Long summonerLevel) {
+        sessionRepository.save(new ActiveSession(puuid, gameName, tagLine, profileIconId, summonerLevel));
+        myPuuid.set(puuid);
+        myGameName.set(gameName);
+        myTagLine.set(tagLine);
+        this.profileIconId.set(profileIconId != null ? profileIconId : 0);
+        this.summonerLevel.set(summonerLevel != null ? summonerLevel : 0);
+    }
+
+    /**
+     * Borra la sesión de H2 y limpia las properties.
+     */
+    public void clearSession() {
+        sessionRepository.deleteAll();
+        myPuuid.set("");
+        myGameName.set("");
+        myTagLine.set("");
+    }
+
+    /**
+     * Indica si hay una sesión activa (para que la UI sepa si mostrar el header).
+     */
+    public boolean hasActiveSession() {
+        return myPuuid.get() != null && !myPuuid.get().isEmpty();
+    }
     public void setMyPuuid(String puuid) {
         Platform.runLater(() -> myPuuid.set(puuid != null ? puuid : ""));
     }
@@ -94,6 +152,8 @@ public class GameStateService {
     public String getActivePlayerName() { return activePlayerName.get(); }
     public String getMyEnemyChampion() { return myEnemyChampion.get(); }
     public String getMyEnemyName() { return myEnemyName.get(); }
+    public long getSavedProfileIconId() { return profileIconId.get(); }
+    public long getSavedSummonerLevel() { return summonerLevel.get(); }
 
     public String getGamePhase() { return gamePhase.get(); }
     public LcuChampSelectDTO getChampSelect() { return champSelect.get(); }

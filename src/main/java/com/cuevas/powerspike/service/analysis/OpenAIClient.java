@@ -163,24 +163,6 @@ public class OpenAIClient {
             return "[Error] Parse: " + e.getMessage();
         }
     }
-    @SuppressWarnings("unchecked")
-    private String extractContent(Map<?, ?> response) {
-        if (response == null) return "[Error] Respuesta vacía de OpenAI";
-
-        try {
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-            if (choices == null || choices.isEmpty()) return "[Error] Sin choices en la respuesta";
-
-            Map<String, Object> message = (Map<String, Object>) choices.getFirst().get("message");
-            if (message == null) return "[Error] Sin message en la respuesta";
-
-            Object content = message.get("content");
-            return content != null ? content.toString() : "";
-        } catch (Exception e) {
-            return "[Error] No se pudo parsear la respuesta: " + e.getMessage();
-        }
-    }
-
     /**
      * Verifica si la API key está configurada.
      * Se usa en el AnalysisEngine para evitar llamar a la API si no está lista.

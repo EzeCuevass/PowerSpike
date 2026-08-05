@@ -14,5 +14,5 @@
     -fx-font-size: 13;
     -fx-font-family: 'Segoe UI', 'Inter', sans-serif;
     -fx-line-spacing: 3;
-    -fx-max-width: 320;
+    -fx-pref-width: 412;
 }

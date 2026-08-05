@@ -32,6 +32,7 @@
                     </VBox>
                     <Label text="●" styleClass="session-dot" />
                     <Label text="Sesión activa" styleClass="session-label" />
+                    <Button fx:id="logoutButton" text="Cerrar sesión" styleClass="btn-logout" />
                 </HBox>
                 
                 <Region HBox.hgrow="ALWAYS" />
@@ -59,6 +60,11 @@
                         </HBox>
 
                         <Label fx:id="searchErrorLabel" text="" styleClass="error-text" />
+
+                        <VBox fx:id="matchHistorySection" spacing="8" managed="false" visible="false">
+                            <Label text="MATCH HISTORY" styleClass="card-title" />
+                            <VBox fx:id="matchHistoryContainer" spacing="6" />
+                        </VBox>
 
                     </VBox>
                 </ScrollPane>

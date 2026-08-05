@@ -3,6 +3,7 @@ package com.cuevas.powerspike.ui;
 import com.cuevas.powerspike.dto.*;
 import com.cuevas.powerspike.service.DataDragonClient;
 import com.cuevas.powerspike.service.GameStateService;
+import com.cuevas.powerspike.service.MatchService;
 import com.cuevas.powerspike.service.RiotApiClient;
 import com.cuevas.powerspike.service.analysis.AnalysisEngine;
 import com.cuevas.powerspike.service.analysis.AnalysisResult;
@@ -31,11 +32,14 @@ public class MainController {
     @FXML private TextField tagLineField;
     @FXML private Button searchButton;
     @FXML private HBox summonerHeaderCard;
+    @FXML private Button logoutButton;
     @FXML private Label summonerNameLabel;
     @FXML private Label summonerLevelLabel;
     @FXML private Label summonerPuuidLabel;
     @FXML private ImageView profileIcon;
     @FXML private Label searchErrorLabel;
+    @FXML private VBox matchHistorySection;
+    @FXML private VBox matchHistoryContainer;
     @FXML private Label statusDot;
     @FXML private Label statusLabel;
     @FXML private Label phaseLabel;
@@ -78,17 +82,20 @@ public class MainController {
     private final GameStateService gameStateService;
     private final AnalysisEngine analysisEngine;
     private final OpenAIClient openAIClient;
+    private final MatchService matchService;
 
     public MainController(RiotApiClient riotApiClient,
                           DataDragonClient dataDragonClient,
                           GameStateService gameStateService,
                           AnalysisEngine analysisEngine,
-                          OpenAIClient openAIClient) {
+                          OpenAIClient openAIClient,
+                          MatchService matchService) {
         this.riotApiClient = riotApiClient;
         this.dataDragonClient = dataDragonClient;
         this.gameStateService = gameStateService;
         this.analysisEngine = analysisEngine;
         this.openAIClient = openAIClient;
+        this.matchService = matchService;
     }
 
     @FXML
@@ -102,7 +109,14 @@ public class MainController {
         gameStateService.liveGameDataProperty().addListener((obs, oldVal, newVal) -> updateLiveGameUI(newVal));
         analysisEngine.latestResultProperty().addListener((obs, oldVal, newVal) -> updateCoachUI(newVal));
 
+        logoutButton.setOnAction(e -> cerrarSesion());
+
         updatePhaseUI(gameStateService.getGamePhase());
+
+        // Restaurar sesión guardada si existe
+        if (gameStateService.hasActiveSession()) {
+            restaurarSesionEnHeader();
+        }
 
         coachConfigLabel.setText(openAIClient.isConfigured()
                 ? "IA configurada (gpt-5.4-mini)"
@@ -343,11 +357,20 @@ public class MainController {
 
         searchErrorLabel.setText("");
 
+        // Limpiar datos anteriores antes de cargar los nuevos
+        matchHistoryContainer.getChildren().clear();
+        matchHistorySection.setVisible(false);
+        matchHistorySection.setManaged(false);
+
         try {
             SummonerDTO summoner = riotApiClient.getSummonerByRiotId(gameName, tagLine);
             gameStateService.setMyPuuid(summoner.puuid());
             gameStateService.setMyRiotId(summoner.gameName(), summoner.tagLine());
+            gameStateService.saveSession(summoner.puuid(), summoner.gameName(), summoner.tagLine(),
+                    summoner.profileIconId() != null ? summoner.profileIconId().longValue() : 0L,
+                    summoner.summonerLevel() != null ? summoner.summonerLevel() : 0L);
             mostrarInvocador(summoner);
+            cargarMatchHistory(gameName, tagLine);
         } catch (Exception e) {
             summonerHeaderCard.setVisible(false);
             summonerHeaderCard.setManaged(false);
@@ -366,6 +389,106 @@ public class MainController {
         summonerHeaderCard.setManaged(true);
     }
 
+    private void restaurarSesionEnHeader() {
+        String gameName = gameStateService.getMyGameName();
+        String tagLine = gameStateService.getMyTagLine();
+        if (gameName.isEmpty()) return;
+
+        summonerNameLabel.setText(gameName + "#" + tagLine);
+
+        long iconId = gameStateService.getSavedProfileIconId();
+        if (iconId > 0) {
+            String iconUrl = "https://ddragon.leagueoflegends.com/cdn/" + dataDragonClient.getCurrentVersion() + "/img/profileicon/" + iconId + ".png";
+            profileIcon.setImage(new Image(iconUrl, true));
+        }
+
+        long level = gameStateService.getSavedSummonerLevel();
+        summonerLevelLabel.setText(level > 0 ? "Nivel " + level : "Sesión restaurada");
+
+        summonerHeaderCard.setVisible(true);
+        summonerHeaderCard.setManaged(true);
+
+        cargarMatchHistory(gameName, tagLine);
+    }
+
+    private void cerrarSesion() {
+        gameStateService.clearSession();
+        summonerHeaderCard.setVisible(false);
+        summonerHeaderCard.setManaged(false);
+        matchHistoryContainer.getChildren().clear();
+        matchHistorySection.setVisible(false);
+        matchHistorySection.setManaged(false);
+        searchErrorLabel.setText("Sesión cerrada");
+    }
+
+    private void cargarMatchHistory(String gameName, String tagLine) {
+        new Thread(() -> {
+            try {
+                var matches = matchService.getMatchHistory(gameName, tagLine, 20);
+                javafx.application.Platform.runLater(() -> mostrarMatchHistory(matches));
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() ->
+                    searchErrorLabel.setText("Error cargando historial: " + e.getMessage()));
+            }
+        }).start();
+    }
+
+    private void mostrarMatchHistory(java.util.List<MatchSummaryDTO> matches) {
+        matchHistoryContainer.getChildren().clear();
+        if (matches.isEmpty()) {
+            matchHistorySection.setManaged(false);
+            matchHistorySection.setVisible(false);
+            return;
+        }
+        matchHistorySection.setVisible(true);
+        matchHistorySection.setManaged(true);
+
+        for (MatchSummaryDTO m : matches) {
+            HBox card = new HBox(12);
+            card.getStyleClass().add("match-card");
+            card.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            Label champLabel = new Label(m.championName() != null ? m.championName() : "Desconocido");
+            champLabel.getStyleClass().add(m.win() ? "match-champ-win" : "match-champ-loss");
+
+            Label kdaLabel = new Label(m.kills() + "/" + m.deaths() + "/" + m.assists());
+            kdaLabel.getStyleClass().add(m.win() ? "match-kda-win" : "match-kda-loss");
+
+            long durationSecs = m.gameDuration();
+            String duration = String.format("%d:%02d", durationSecs / 60, durationSecs % 60);
+
+            Label resultLabel = new Label(m.win() ? "VICTORIA" : "DERROTA");
+            resultLabel.getStyleClass().add(m.win() ? "match-win" : "match-loss");
+
+            Label infoLabel = new Label(duration + " · " + getTimeAgo(m.gameCreation()));
+            infoLabel.getStyleClass().add("match-info");
+
+            String itemsStr = m.items() != null ? String.join(", ", m.items()) : "";
+            Label itemsLabel = new Label(itemsStr);
+            itemsLabel.getStyleClass().add("match-items");
+
+            VBox leftBox = new VBox(4);
+            leftBox.getChildren().addAll(champLabel, kdaLabel, infoLabel);
+            VBox rightBox = new VBox(4);
+            rightBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+            rightBox.getChildren().addAll(resultLabel, itemsLabel);
+            HBox.setHgrow(rightBox, javafx.scene.layout.Priority.ALWAYS);
+
+            card.getChildren().addAll(leftBox, rightBox);
+            matchHistoryContainer.getChildren().add(card);
+        }
+    }
+
+    private String getTimeAgo(long gameCreationMs) {
+        long diffMs = System.currentTimeMillis() - gameCreationMs;
+        long mins = diffMs / 60000;
+        if (mins < 60) return "hace " + mins + "m";
+        long hours = mins / 60;
+        if (hours < 24) return "hace " + hours + "h";
+        long days = hours / 24;
+        return "hace " + days + "d";
+    }
+
     private void updateCoachUI(AnalysisResult result) {
         if (result == null) return;
 
@@ -377,6 +500,7 @@ public class MainController {
         String triggerName = switch (result.trigger()) {
             case CHAMP_SELECT_END -> "CHAMP SELECT";
             case LIVE_CLIENT_MATCHUP -> "MATCHUP CONCRETO";
+            case OBJECTIVE_SPAWN -> "OBJETIVO";
             case DEATH -> "MUERTE";
             case GAME_END -> "POST-GAME";
         };

@@ -58,6 +58,8 @@ public class OverlayController {
         adviceLabel.setOpacity(1.0);
         adviceLabel.setVisible(true);
         adviceLabel.setManaged(true);
+        adviceLabel.applyCss();
+        adviceLabel.layout();
         requestResize();
         hideTimer.playFromStart();
     }
@@ -66,12 +68,20 @@ public class OverlayController {
         fadeOut.playFromStart();
     }
 
+    private boolean resizing = false;
+
     /**
      * Notifica al stage padre que debe recalcular su tamaño.
      */
     private void requestResize() {
-        if (overlayRoot != null && overlayRoot.getScene() != null) {
-            overlayRoot.getScene().getWindow().sizeToScene();
+        if (resizing) return;
+        resizing = true;
+        try {
+            if (overlayRoot != null && overlayRoot.getScene() != null) {
+                overlayRoot.getScene().getWindow().sizeToScene();
+            }
+        } finally {
+            resizing = false;
         }
     }
 

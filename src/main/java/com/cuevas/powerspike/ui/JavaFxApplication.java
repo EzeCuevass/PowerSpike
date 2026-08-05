@@ -73,6 +73,9 @@ public class JavaFxApplication extends Application {
 
     @Override
     public void stop() {
+        try {
+            springContext.getBean(OverlayControlBar.class).hideAll();
+        } catch (Exception ignored) {}
         springContext.close();
     }
 

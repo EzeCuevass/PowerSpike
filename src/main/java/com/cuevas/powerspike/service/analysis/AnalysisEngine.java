@@ -48,6 +48,14 @@ public class AnalysisEngine {
     private long lastAnalysisTime = 0;          // Timestamp del último análisis (para cooldown)
     private static final long MIN_INTERVAL_MS = 30_000; // Cooldown mínimo entre análisis
 
+    // Trackear kills de objetivos para calcular próximos spawns
+    private double lastDragonKill = -1;
+    private double lastHeraldKill = -1;
+    private double lastBaronKill = -1;
+    private double lastHordeKill = -1;
+    private double lastObjectiveCheck = 0;
+    private double lastAlertedSpawn = -1;
+
     public AnalysisEngine(GameStateService gameStateService,
                           PromptBuilder promptBuilder,
                           OpenAIClient openAIClient,
@@ -94,25 +102,6 @@ public class AnalysisEngine {
         if (oldPhase == null) oldPhase = "CLOSED";
         if (newPhase == null) newPhase = "CLOSED";
 
-        if ("ChampSelect".equals(oldPhase) && !"ChampSelect".equals(newPhase)) {
-            // Champ select analysis deshabilitado
-        }
-
-        // Si la fase entra en InProgress y el champ select no se detectó (app iniciada tarde),
-        // disparar el análisis especulativo con los datos del LiveClient
-        // Deshabilitado
-        /*
-        if ("InProgress".equals(newPhase) && !"InProgress".equals(oldPhase)) {
-            LiveClientAllDataDTO liveData = gameStateService.getLiveGameData();
-            if (liveData != null && liveData.allPlayers() != null && liveData.allPlayers().size() == 10) {
-                LcuChampSelectDTO cs = gameStateService.getChampSelect();
-                if (cs == null) {
-                    triggerChampSelectAnalysis(liveData);
-                }
-            }
-        }
-        */
-
         if ("InProgress".equals(oldPhase) && !"InProgress".equals(newPhase)) {
             LiveClientAllDataDTO liveData = gameStateService.getLiveGameData();
             // Si el LiveClient ya se desconectó, intentar obtener los últimos datos directamente
@@ -149,9 +138,88 @@ public class AnalysisEngine {
                 if (now - lastAnalysisTime >= MIN_INTERVAL_MS) {
                     triggerDeathAnalysis(newData, event);
                 }
-                break; // Solo procesar la primera muerte nueva
+                break;
             }
         }
+
+        // Trackear kills de objetivos para calcular próximos spawns
+        for (LiveClientEventDTO event : events) {
+            String eventName = event.EventName();
+            if ("DragonKill".equals(eventName)) lastDragonKill = event.EventTime();
+            else if ("HeraldKill".equals(eventName)) lastHeraldKill = event.EventTime();
+            else if ("BaronKill".equals(eventName)) lastBaronKill = event.EventTime();
+            else if ("HordeKill".equals(eventName)) lastHordeKill = event.EventTime();
+        }
+
+        // Verificar próximos spawns cada ~10s
+        if (!events.isEmpty()) {
+            double gameTime = events.getLast().EventTime();
+            if (gameTime - lastObjectiveCheck >= 10 && !previousPhase.equals("CLOSED")) {
+                lastObjectiveCheck = gameTime;
+                checkUpcomingObjectives(newData, gameTime);
+            }
+        }
+    }
+
+    /**
+     * Verifica si algún objetivo está por spawnear en los próximos 30s.
+     */
+    private void checkUpcomingObjectives(LiveClientAllDataDTO data, double gameTime) {
+        checkSpawn(data, gameTime, lastDragonKill, 300, 300, "Dragón");
+        checkSpawn(data, gameTime, lastHeraldKill, 840, 360, "Heraldo");
+        checkSpawn(data, gameTime, lastBaronKill, 1200, 360, "Barón");
+
+        // Larvas solo spawn una vez (6:00 = 360s)
+        if (lastHordeKill < 0 && gameTime >= 330 && gameTime <= 335) {
+            if (lastAlertedSpawn < 330) {
+                lastAlertedSpawn = 330;
+                triggerObjectiveSpawnAnalysis(data, "Larvas", 360);
+            }
+        }
+    }
+
+    private void checkSpawn(LiveClientAllDataDTO data, double gameTime, double lastKill,
+                            double firstSpawn, double respawn, String name) {
+        double nextSpawn = lastKill < 0 ? firstSpawn : lastKill + respawn;
+        if (gameTime >= nextSpawn - 35 && gameTime <= nextSpawn - 25) {
+            if (lastAlertedSpawn < nextSpawn - 30) {
+                lastAlertedSpawn = nextSpawn - 30;
+                triggerObjectiveSpawnAnalysis(data, name, nextSpawn);
+            }
+        }
+    }
+
+    private void triggerObjectiveSpawnAnalysis(LiveClientAllDataDTO data, String objective, double spawnTime) {
+        if (!openAIClient.isConfigured()) return;
+
+        // Calcular kills y ventaja por equipo
+        int blueKills = data.allPlayers().stream()
+                .filter(p -> "ORDER".equals(p.team()))
+                .mapToInt(p -> p.scores() != null ? p.scores().kills() : 0).sum();
+        int redKills = data.allPlayers().stream()
+                .filter(p -> "CHAOS".equals(p.team()))
+                .mapToInt(p -> p.scores() != null ? p.scores().kills() : 0).sum();
+
+        // Determinar de qué equipo sos
+        LiveClientPlayerDTO myPlayer = data.allPlayers().stream()
+                .filter(p -> p.summonerName() != null && 
+                    (p.summonerName().equals(data.activePlayer().summonerName()) 
+                     || p.championName().equals(data.activePlayer().championName())))
+                .findFirst().orElse(null);
+        String myTeam = myPlayer != null ? myPlayer.team() : "ORDER";
+        boolean isBlue = "ORDER".equals(myTeam);
+
+        int myKills = isBlue ? blueKills : redKills;
+        int enemyKills = isBlue ? redKills : blueKills;
+        int advantage = myKills - enemyKills;
+
+        // Aliados muertos ahora
+        long deadAllies = data.allPlayers().stream()
+                .filter(p -> myTeam.equals(p.team()) && p.isDead()).count();
+
+        String prompt = promptBuilder.buildObjectiveSpawnPrompt(data, objective, spawnTime,
+                myKills, enemyKills, advantage, deadAllies);
+        runAnalysis(AnalysisTrigger.OBJECTIVE_SPAWN, prompt);
     }
 
     /**
@@ -272,9 +340,15 @@ public class AnalysisEngine {
 
         // Contexto de asistentes: 1v1 vs gank
         int assisters = deathEvent.Assisters() != null ? deathEvent.Assisters().size() : 0;
-        String fightType = assisters == 0 ? "1v1 (duelo individual)"
-                : assisters == 1 ? "1v2 (ganked)"
-                : "1v" + (assisters + 1) + " (ganked o team fight)";
+        String fightType = assisters == 0 ? "Te mató solo el killer"
+                : assisters == 1 ? "Te mataron entre 2 enemigos"
+                : "Te mataron entre " + (assisters + 1) + " enemigos";
+
+        // Contar aliados muertos en este momento
+        long deadAllies = data.allPlayers().stream()
+                .filter(p -> myTeam.equals(p.team()) && p.isDead()).count();
+        String deadAlliesText = deadAllies > 0 ? "Tenés " + deadAllies + " aliado(s) muerto(s) en este momento."
+                : "Todos tus aliados están vivos.";
 
         String assistersList = "";
         if (deathEvent.Assisters() != null && !deathEvent.Assisters().isEmpty()) {
@@ -295,7 +369,7 @@ public class AnalysisEngine {
         }
 
         String prompt = promptBuilder.buildDeathPrompt(data, deathEvent, myRole, deathZone, 
-                visionText, fightType, killerComparison, assistersList);
+                visionText, fightType, killerComparison, assistersList, myTeam, deadAlliesText);
         
         AnalysisContext ctx = AnalysisContext.death(data, deathEvent, myChamp, myName, minute);
         runDeathAnalysisWithScreenshot(ctx, prompt);
@@ -340,26 +414,6 @@ public class AnalysisEngine {
             }
         }
         return count;
-    }
-
-    /**
-     * Busca eventos ocurridos 30 segundos antes y después de la muerte.
-     * Ayuda a contextualizar si la muerte fue en una team fight, objetivo, etc.
-     */
-    private String findNearbyEvents(LiveClientEventsDTO events, double deathTime) {
-        if (events == null || events.Events() == null) return "sin eventos cercanos";
-
-        List<LiveClientEventDTO> nearby = events.Events().stream()
-                .filter(e -> Math.abs(e.EventTime() - deathTime) <= 30.0)
-                .filter(e -> !"ChampionKill".equals(e.EventName())) // Excluir otras muertes
-                .limit(3)
-                .toList();
-
-        if (nearby.isEmpty()) return "sin eventos cercanos";
-
-        return nearby.stream()
-                .map(e -> e.EventName() + " (min " + (int)(e.EventTime()/60) + ")")
-                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     /**

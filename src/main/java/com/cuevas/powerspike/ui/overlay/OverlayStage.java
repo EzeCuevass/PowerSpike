@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 public class OverlayStage {
 
     private static final String OVERLAY_TITLE = "PowerSpikeOverlay";
-    private static final double WIDTH = 340;
+    private static final double WIDTH = 440;
     private static final double MARGIN = 20;
 
     private final ConfigurableApplicationContext springContext;
@@ -36,7 +36,7 @@ public class OverlayStage {
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
 
-            Scene scene = new Scene(root, WIDTH, 60);
+            Scene scene = new Scene(root, WIDTH, -1);
             scene.setFill(null);
             scene.getStylesheets().add(getClass().getResource("/css/overlay.css").toExternalForm());
 
@@ -46,6 +46,8 @@ public class OverlayStage {
             stage.setScene(scene);
             stage.setAlwaysOnTop(true);
             stage.setResizable(false);
+            stage.setMinHeight(1);
+            stage.setMaxHeight(700);
 
             positionTopRight();
 

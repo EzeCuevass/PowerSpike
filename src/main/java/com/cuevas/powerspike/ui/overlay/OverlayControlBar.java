@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 public class OverlayControlBar {
 
     private static final String CONTROL_BAR_TITLE = "PowerSpikeControlBar";
-    private static final double WIDTH = 340;
+    private static final double WIDTH = 440;
     private static final double HEIGHT = 28;
     private static final double MARGIN = 20;
 
@@ -88,12 +88,12 @@ public class OverlayControlBar {
 
         // Drag handling
         root.setOnMousePressed(e -> {
-            dragOffsetX = e.getSceneX();
-            dragOffsetY = e.getSceneY();
+            dragOffsetX = e.getScreenX() - stage.getX();
+            dragOffsetY = e.getScreenY() - stage.getY();
         });
         root.setOnMouseDragged(e -> {
-            double newX = stage.getX() + e.getSceneX() - dragOffsetX;
-            double newY = stage.getY() + e.getSceneY() - dragOffsetY;
+            double newX = e.getScreenX() - dragOffsetX;
+            double newY = e.getScreenY() - dragOffsetY;
             stage.setX(newX);
             stage.setY(newY);
             if (overlayStage != null && overlayStage.isShowing()) {

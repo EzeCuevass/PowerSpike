@@ -180,7 +180,8 @@ public class PromptBuilder {
      */
     public String buildDeathPrompt(LiveClientAllDataDTO data, LiveClientEventDTO death,
                                     String myRole, String deathZone, String visionText,
-                                    String fightType, String killerComparison, String assistersList) {
+                                    String fightType, String killerComparison, String assistersList,
+                                    String myTeam, String deadAlliesText) {
         LiveClientActivePlayerDTO ap = data.activePlayer();
         LiveClientPlayerDTO myPlayer = findMyPlayer(data);
         LiveClientPlayerDTO killer = findKiller(data, death);
@@ -209,13 +210,14 @@ public class PromptBuilder {
                 - Visión: %s
                 %s
                 %s
+                - %s
                 
                 Analizá la captura de LoL como un coach en tiempo real.
                 Usá internamente este análisis para darme UN consejo accionable.
                 No imprimas el análisis, solo la conclusión.
                 
                 Tu análisis interno (no lo imprimas):
-                - Lado del mapa: blue / red / no determinable
+                - Lado: tu equipo es %s (%s, jungla al %s lado del mapa)
                 - Ubicación: zona exacta (top, bot, río, jungla, blue buff, etc.)
                 - Visión: wards aliadas o enemigas visibles
                 - ¿Aliados o enemigos cerca?
@@ -238,7 +240,54 @@ public class PromptBuilder {
                 fightType,
                 visionText,
                 killerComparison,
-                assistersList != null && !assistersList.isEmpty() ? assistersList : ""
+                assistersList != null && !assistersList.isEmpty() ? assistersList : "",
+                deadAlliesText,
+                "ORDER".equals(myTeam) ? "Azul (ORDER), jungla al lado IZQUIERDO del mapa" : "Rojo (CHAOS), jungla al lado DERECHO del mapa",
+                "ORDER".equals(myTeam) ? "Azul" : "Rojo",
+                "ORDER".equals(myTeam) ? "izquierdo" : "derecho"
+        );
+    }
+
+    /**
+     * Arma el prompt para aviso de objetivo próximo a spawnear con contexto de equipo.
+     */
+    public String buildObjectiveSpawnPrompt(LiveClientAllDataDTO data, String objective, double spawnTime,
+                                            int myKills, int enemyKills, int advantage, long deadAllies) {
+        int minute = (int)(spawnTime / 60);
+        int seconds = (int)(spawnTime % 60);
+
+        String myChamp = data.activePlayer() != null ? data.activePlayer().championName() : "desconocido";
+        LiveClientPlayerDTO myPlayer = findMyPlayer(data);
+        String myRole = myPlayer != null && myPlayer.position() != null ? myPlayer.position() : "rol desconocido";
+        String myStats = myPlayer != null ? formatPlayerStats(myPlayer) : "N/A";
+        String myItems = formatItems(myPlayer);
+
+        String advantageStr = advantage > 2 ? "Tu equipo está fuerte (+" + advantage + " kills). Pelealo."
+                : advantage < -2 ? "Tu equipo va perdiendo (" + Math.abs(advantage) + " kills abajo). Pensalo bien."
+                : "Está parejo (" + advantage + " kills de diferencia). Depende del posicionamiento.";
+
+        String deadStr = deadAllies > 0 ? "Tenés " + deadAllies + " aliado(s) muerto(s) ahora. No conviene pelear sin ellos."
+                : "Todos los aliados están vivos.";
+
+        return """
+                %s va a aparecer en ~30 segundos (%d:%02d).
+                
+                Sos %s jugando %s (%s).
+                Tus stats: %s
+                Tus items: %s
+                
+                Score: tu equipo %d kills - enemigos %d kills
+                %s
+                %s
+                
+                Dame un consejo breve y accionable: ¿vale la pena pelearlo o no? ¿Qué hacer ahora?
+                Máximo 3 líneas.
+                """.formatted(
+                objective, minute, seconds,
+                myChamp, myStats, myRole,
+                myStats, myItems,
+                myKills, enemyKills,
+                advantageStr, deadStr
         );
     }
 

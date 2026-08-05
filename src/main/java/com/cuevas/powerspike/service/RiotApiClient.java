@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -130,5 +132,30 @@ public class RiotApiClient {
             }
             throw e;
         }
+    }
+
+    public List<String> getMatchIds(String puuid, int count) {
+        String url = accountUrl + "/lol/match/v5/matches/by-puuid/" + puuid
+                + "/ids?start=0&count=" + count;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Riot-Token", apiKey);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<List<String>> response = restTemplate.exchange(
+                url, HttpMethod.GET, entity,
+                (Class<List<String>>) (Class<?>) List.class);
+        return response.getBody();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getMatchDetail(String matchId) {
+        String url = accountUrl + "/lol/match/v5/matches/" + matchId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Riot-Token", apiKey);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        return restTemplate.exchange(url, HttpMethod.GET, entity, Map.class).getBody();
     }
 }
