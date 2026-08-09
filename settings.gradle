@@ -1,1 +1,3 @@
 rootProject.name = 'powerspike'
+
+include 'common', 'backend', 'frontend'
