@@ -1,3 +1,0 @@
-2026-08-04 22:31:57.729275-03:00 jdbc[3]: exception
-org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "ACTIVE_SESSION" not found (this database is empty); SQL statement:
-select as1_0.id,as1_0.game_name,as1_0.profile_icon_id,as1_0.puuid,as1_0.summoner_level,as1_0.tag_line from active_session as1_0 where as1_0.id=? [42104-240]
