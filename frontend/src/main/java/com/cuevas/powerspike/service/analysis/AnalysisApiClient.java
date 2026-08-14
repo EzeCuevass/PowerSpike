@@ -1,13 +1,19 @@
 package com.cuevas.powerspike.service.analysis;
 
 import com.cuevas.powerspike.analysis.*;
+import com.cuevas.powerspike.service.AuthService;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.ExecutorService;
@@ -20,7 +26,7 @@ import java.util.concurrent.Executors;
  *
  * Publica el resultado en la misma ObjectProperty<AnalysisResult> que ya
  * consumían MainController y OverlayController, para no romper el contrato
- * de UI existente.
+ * de UI existente. Añade el token JWT de AuthService a cada request.
  */
 @Service
 public class AnalysisApiClient {
@@ -29,13 +35,16 @@ public class AnalysisApiClient {
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final AuthService authService;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ObjectProperty<AnalysisResult> latestResult = new SimpleObjectProperty<>();
 
     public AnalysisApiClient(RestTemplate restTemplate,
-                             @Value("${backend.base-url:http://localhost:8080}") String baseUrl) {
+                             @Value("${backend.base-url:http://localhost:8080}") String baseUrl,
+                             AuthService authService) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl;
+        this.authService = authService;
     }
 
     public void analyzeChampSelect(ChampSelectAnalysisRequest request) {
@@ -62,7 +71,15 @@ public class AnalysisApiClient {
         executor.submit(() -> {
             AnalysisResult result;
             try {
-                AnalysisResponse response = restTemplate.postForObject(baseUrl + path, body, AnalysisResponse.class);
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                String token = authService.getToken();
+                if (token != null && !token.isBlank()) {
+                    headers.set("Authorization", "Bearer " + token);
+                }
+                HttpEntity<Object> entity = new HttpEntity<>(body, headers);
+
+                AnalysisResponse response = restTemplate.postForObject(baseUrl + path, entity, AnalysisResponse.class);
                 if (response == null) {
                     result = AnalysisResult.error(trigger, null, "Respuesta vacía del backend.");
                 } else if (response.success()) {
@@ -72,6 +89,14 @@ public class AnalysisApiClient {
                     }
                 } else {
                     result = AnalysisResult.error(trigger, null, response.errorMessage());
+                }
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                    // Token vencido/inválido → volver al login
+                    authService.handleUnauthorized();
+                    result = AnalysisResult.error(trigger, null, "Sesión expirada. Volvé a iniciar sesión.");
+                } else {
+                    result = AnalysisResult.error(trigger, null, "Backend: " + e.getStatusCode());
                 }
             } catch (Exception e) {
                 log.warn("No se pudo contactar al backend para {}: {}", path, e.getMessage());

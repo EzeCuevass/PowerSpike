@@ -35,8 +35,10 @@ out/
 
 ### VS Code ###
 .vscode/
-# API Keys
+# API Keys y variables de entorno
 application.properties
+.env
+*.env
 
 # H2 Database
 *.mv.db

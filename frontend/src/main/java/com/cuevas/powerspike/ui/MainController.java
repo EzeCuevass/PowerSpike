@@ -2,6 +2,7 @@ package com.cuevas.powerspike.ui;
 
 import com.cuevas.powerspike.analysis.AnalysisTrigger;
 import com.cuevas.powerspike.dto.*;
+import com.cuevas.powerspike.service.AuthService;
 import com.cuevas.powerspike.service.BackendApiClient;
 import com.cuevas.powerspike.service.GameStateService;
 import com.cuevas.powerspike.service.analysis.AnalysisApiClient;
@@ -9,6 +10,7 @@ import com.cuevas.powerspike.service.analysis.AnalysisResult;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
@@ -24,6 +26,19 @@ import java.util.Date;
 @Component
 @SuppressWarnings("unused")
 public class MainController {
+
+    @FXML private VBox loginPanel;
+    @FXML private TextField loginEmailField;
+    @FXML private Label loginEmailLabel;
+    @FXML private Label loginUsernameLabel;
+    @FXML private TextField loginUsernameField;
+    @FXML private PasswordField loginPasswordField;
+    @FXML private Label loginConfirmLabel;
+    @FXML private PasswordField loginConfirmField;
+    @FXML private Label loginErrorLabel;
+    @FXML private Button loginSubmitButton;
+    @FXML private Label loginSwitchPrompt;
+    @FXML private Button loginSwitchButton;
 
     @FXML private TextField gameNameField;
     @FXML private TextField tagLineField;
@@ -77,13 +92,18 @@ public class MainController {
     private final BackendApiClient backendApiClient;
     private final GameStateService gameStateService;
     private final AnalysisApiClient analysisApiClient;
+    private final AuthService authService;
+
+    private boolean registerMode = false;
 
     public MainController(BackendApiClient backendApiClient,
                           GameStateService gameStateService,
-                          AnalysisApiClient analysisApiClient) {
+                          AnalysisApiClient analysisApiClient,
+                          AuthService authService) {
         this.backendApiClient = backendApiClient;
         this.gameStateService = gameStateService;
         this.analysisApiClient = analysisApiClient;
+        this.authService = authService;
     }
 
     @FXML
@@ -99,14 +119,101 @@ public class MainController {
 
         logoutButton.setOnAction(e -> cerrarSesion());
 
+        setupLoginPanel();
+
         updatePhaseUI(gameStateService.getGamePhase());
 
-        // Restaurar sesión guardada si existe
+        // Restaurar sesión de cuenta (auto-login) y de Riot si existen
+        authService.loggedInProperty().addListener((obs, oldVal, newVal) -> updateLoginVisibility(newVal));
+        authService.restoreSession();
+        updateLoginVisibility(authService.isLoggedIn());
+
         if (gameStateService.hasActiveSession()) {
             restaurarSesionEnHeader();
         }
 
-        coachConfigLabel.setText("Coach IA (backend: " + (backendApiClient.isReachable() ? "conectado" : "no disponible") + ")");
+//        coachConfigLabel.setText("Coach IA (backend: " + (backendApiClient.isReachable() ? "conectado" : "no disponible") + ")");
+    }
+
+    private void setupLoginPanel() {
+        loginSubmitButton.setOnAction(e -> submitAuth());
+        loginSwitchButton.setOnAction(e -> toggleAuthMode());
+        loginPasswordField.setOnAction(e -> submitAuth());
+        loginConfirmField.setOnAction(e -> submitAuth());
+    }
+
+    private void toggleAuthMode() {
+        registerMode = !registerMode;
+        boolean reg = registerMode;
+        loginUsernameLabel.setVisible(reg);
+        loginUsernameLabel.setManaged(reg);
+        loginUsernameField.setVisible(reg);
+        loginUsernameField.setManaged(reg);
+        loginConfirmLabel.setVisible(reg);
+        loginConfirmLabel.setManaged(reg);
+        loginConfirmField.setVisible(reg);
+        loginConfirmField.setManaged(reg);
+        loginSubmitButton.setText(reg ? "Crear cuenta" : "Iniciar sesión");
+        loginSwitchPrompt.setText(reg ? "¿Ya tenés cuenta?" : "¿No tenés cuenta?");
+        loginSwitchButton.setText(reg ? "Iniciar sesión" : "Registrate");
+        loginErrorLabel.setText("");
+    }
+
+    private void submitAuth() {
+        String mail = loginEmailField.getText().trim();
+        String password = loginPasswordField.getText();
+        if (mail.isEmpty() || password.isEmpty()) {
+            loginErrorLabel.setText("Completá email y contraseña.");
+            return;
+        }
+
+        loginErrorLabel.setText("Procesando...");
+        loginSubmitButton.setDisable(true);
+
+        new Thread(() -> {
+            String error;
+            if (registerMode) {
+                String username = loginUsernameField.getText().trim();
+                String confirm = loginConfirmField.getText();
+                if (username.isEmpty()) {
+                    javafx.application.Platform.runLater(() -> {
+                        loginErrorLabel.setText("Completá el username.");
+                        loginSubmitButton.setDisable(false);
+                    });
+                    return;
+                }
+                if (!password.equals(confirm)) {
+                    javafx.application.Platform.runLater(() -> {
+                        loginErrorLabel.setText("Las contraseñas no coinciden.");
+                        loginSubmitButton.setDisable(false);
+                    });
+                    return;
+                }
+                error = authService.register(mail, username, password);
+            } else {
+                error = authService.login(mail, password);
+            }
+
+            javafx.application.Platform.runLater(() -> {
+                if (error != null) {
+                    loginErrorLabel.setText(error);
+                }
+                loginSubmitButton.setDisable(false);
+            });
+        }).start();
+    }
+
+    private void updateLoginVisibility(boolean loggedIn) {
+        if (loginPanel == null || mainTabPane == null) return;
+        loginPanel.setVisible(!loggedIn);
+        loginPanel.setManaged(!loggedIn);
+        mainTabPane.setVisible(loggedIn);
+        mainTabPane.setManaged(loggedIn);
+        if (loggedIn) {
+            loginErrorLabel.setText("");
+            loginPasswordField.clear();
+            loginConfirmField.clear();
+        }
     }
 
     private void updatePhaseUI(String phase) {
@@ -399,6 +506,7 @@ public class MainController {
 
     private void cerrarSesion() {
         gameStateService.clearSession();
+        authService.logout();
         summonerHeaderCard.setVisible(false);
         summonerHeaderCard.setManaged(false);
         matchHistoryContainer.getChildren().clear();
@@ -429,10 +537,21 @@ public class MainController {
         matchHistorySection.setVisible(true);
         matchHistorySection.setManaged(true);
 
+        String version = backendApiClient.getCurrentVersion();
+
         for (MatchSummaryDTO m : matches) {
             HBox card = new HBox(12);
             card.getStyleClass().add("match-card");
             card.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            // Icono del campeón
+            ImageView champIcon = new ImageView();
+            champIcon.setFitWidth(40);
+            champIcon.setFitHeight(40);
+            champIcon.getStyleClass().add("match-champion-icon");
+            String champUrl = "https://ddragon.leagueoflegends.com/cdn/" + version + "/img/champion/"
+                    + (m.championName() != null ? m.championName().replace(" ", "") : "Unknown") + ".png";
+            champIcon.setImage(new Image(champUrl, true));
 
             Label champLabel = new Label(m.championName() != null ? m.championName() : "Desconocido");
             champLabel.getStyleClass().add(m.win() ? "match-champ-win" : "match-champ-loss");
@@ -449,18 +568,31 @@ public class MainController {
             Label infoLabel = new Label(duration + " · " + getTimeAgo(m.gameCreation()));
             infoLabel.getStyleClass().add("match-info");
 
-            String itemsStr = m.items() != null ? String.join(", ", m.items()) : "";
-            Label itemsLabel = new Label(itemsStr);
-            itemsLabel.getStyleClass().add("match-items");
-
             VBox leftBox = new VBox(4);
             leftBox.getChildren().addAll(champLabel, kdaLabel, infoLabel);
+
+            // Items + trinket (iconos)
+            HBox itemsBox = new HBox(4);
+            itemsBox.getStyleClass().add("match-items-row");
+            if (m.items() != null) {
+                for (Integer itemId : m.items()) {
+                    if (itemId == null || itemId <= 0) continue;
+                    ImageView itemIcon = new ImageView();
+                    itemIcon.setFitWidth(24);
+                    itemIcon.setFitHeight(24);
+                    itemIcon.getStyleClass().add("match-item-icon");
+                    String itemUrl = "https://ddragon.leagueoflegends.com/cdn/" + version + "/img/item/" + itemId + ".png";
+                    itemIcon.setImage(new Image(itemUrl, true));
+                    itemsBox.getChildren().add(itemIcon);
+                }
+            }
+
             VBox rightBox = new VBox(4);
             rightBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
-            rightBox.getChildren().addAll(resultLabel, itemsLabel);
+            rightBox.getChildren().addAll(resultLabel, itemsBox);
             HBox.setHgrow(rightBox, javafx.scene.layout.Priority.ALWAYS);
 
-            card.getChildren().addAll(leftBox, rightBox);
+            card.getChildren().addAll(champIcon, leftBox, rightBox);
             matchHistoryContainer.getChildren().add(card);
         }
     }

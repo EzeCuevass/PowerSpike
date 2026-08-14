@@ -527,6 +527,24 @@
     -fx-font-size: 10;
 }
 
+.match-champion-icon {
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-color: -fx-card-border;
+    -fx-border-width: 1;
+}
+
+.match-items-row {
+    -fx-alignment: center-right;
+}
+
+.match-item-icon {
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-border-color: -fx-card-border;
+    -fx-border-width: 1;
+}
+
 .pick-row {
     -fx-font-size: 13;
     -fx-font-weight: bold;
@@ -543,4 +561,45 @@
 
 .pick-neutral {
     -fx-text-fill: -fx-text-secondary;
+}
+
+.login-panel {
+    -fx-background-color: -fx-dark-bg;
+}
+
+.login-box {
+    -fx-background-color: -fx-card-bg;
+    -fx-background-radius: 12;
+    -fx-border-color: -fx-card-border;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 32;
+    -fx-max-width: 360;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 20, 0, 0, 4);
+}
+
+.login-title {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 26;
+    -fx-font-weight: bold;
+}
+
+.field-label {
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 12;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0 0 0;
+}
+
+.btn-link {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-primary;
+    -fx-font-size: 12;
+    -fx-cursor: hand;
+    -fx-padding: 2 4;
+}
+
+.btn-link:hover {
+    -fx-text-fill: -fx-primary-hover;
+    -fx-underline: true;
 }

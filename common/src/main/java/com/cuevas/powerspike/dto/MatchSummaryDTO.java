@@ -15,5 +15,5 @@ public record MatchSummaryDTO(
     int cs,
     long damageDealt,
     double visionScore,
-    List<String> items
+    List<Integer> items
 ) {}

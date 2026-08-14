@@ -136,12 +136,11 @@ public class MatchService {
     }
 
     private MatchSummaryDTO toSummaryDTO(MatchEntity e) {
-        List<String> itemNames = new ArrayList<>();
+        List<Integer> itemIds = new ArrayList<>();
         if (e.getItems() != null && !e.getItems().isEmpty()) {
             for (String idStr : e.getItems().split(",")) {
                 try {
-                    int id = Integer.parseInt(idStr.trim());
-                    itemNames.add(dataDragonClient.getItemName(id));
+                    itemIds.add(Integer.parseInt(idStr.trim()));
                 } catch (NumberFormatException ignored) {}
             }
         }
@@ -159,7 +158,7 @@ public class MatchService {
                 e.getCs(),
                 e.getDamageDealt(),
                 e.getVisionScore(),
-                itemNames
+                itemIds
         );
     }
 

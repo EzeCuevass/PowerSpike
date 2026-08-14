@@ -2,6 +2,7 @@
 
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
@@ -11,6 +12,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.cuevas.powerspike.ui.MainController" styleClass="root-pane">
@@ -47,14 +49,15 @@
     </top>
 
     <center>
-        <TabPane fx:id="mainTabPane" styleClass="main-tab-pane" tabClosingPolicy="UNAVAILABLE">
+        <StackPane>
+            <TabPane fx:id="mainTabPane" styleClass="main-tab-pane" tabClosingPolicy="UNAVAILABLE">
             
             <Tab text="Perfil" fx:id="profileTab">
                 <ScrollPane fitToWidth="true" styleClass="content-scroll">
                     <VBox spacing="16" style="-fx-padding: 20;">
                         
                         <HBox styleClass="search-bar" spacing="10">
-                            <TextField fx:id="gameNameField" promptText="Nombre (ej: Faker)" HBox.hgrow="ALWAYS" styleClass="search-input" />
+                            <TextField fx:id="gameNameField" promptText="User" HBox.hgrow="ALWAYS" styleClass="search-input" />
                             <TextField fx:id="tagLineField" promptText="Tag" prefWidth="80" styleClass="search-input" />
                             <Button fx:id="searchButton" text="Buscar" styleClass="btn-primary" />
                         </HBox>
@@ -189,6 +192,32 @@
             </Tab>
 
         </TabPane>
+
+            <VBox fx:id="loginPanel" styleClass="login-panel" alignment="CENTER" spacing="10" managed="true" visible="true">
+                <VBox styleClass="login-box" alignment="CENTER_LEFT" spacing="12">
+                    <Label text="PowerSpike" styleClass="login-title" />
+                    <Label text="Iniciá sesión para continuar" styleClass="text-muted" />
+
+                    <Label fx:id="loginEmailLabel" text="Email" styleClass="field-label" />
+                    <TextField fx:id="loginEmailField" promptText="tucorreo@mail.com" styleClass="search-input" />
+                    <Label fx:id="loginUsernameLabel" text="Username" styleClass="field-label" managed="false" visible="false" />
+                    <TextField fx:id="loginUsernameField" promptText="Nombre de usuario" styleClass="search-input" managed="false" visible="false" />
+                    <Label text="Contraseña" styleClass="field-label" />
+                    <PasswordField fx:id="loginPasswordField" promptText="Contraseña" styleClass="search-input" />
+                    <Label fx:id="loginConfirmLabel" text="Confirmar contraseña" styleClass="field-label" managed="false" visible="false" />
+                    <PasswordField fx:id="loginConfirmField" promptText="Repetí la contraseña" styleClass="search-input" managed="false" visible="false" />
+
+                    <Label fx:id="loginErrorLabel" text="" styleClass="error-text" wrapText="true" />
+
+                    <Button fx:id="loginSubmitButton" text="Iniciar sesión" styleClass="btn-primary" maxWidth="Infinity" />
+
+                    <HBox alignment="CENTER" spacing="4">
+                        <Label fx:id="loginSwitchPrompt" text="¿No tenés cuenta?" styleClass="text-muted" />
+                        <Button fx:id="loginSwitchButton" text="Registrate" styleClass="btn-link" />
+                    </HBox>
+                </VBox>
+            </VBox>
+        </StackPane>
     </center>
 
 </BorderPane>

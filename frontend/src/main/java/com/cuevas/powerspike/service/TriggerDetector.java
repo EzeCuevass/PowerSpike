@@ -66,6 +66,14 @@ public class TriggerDetector {
         if (oldPhase == null) oldPhase = "CLOSED";
         if (newPhase == null) newPhase = "CLOSED";
 
+        // Nueva partida en formación: resetear todo el estado de triggers de la
+        // partida anterior. Sin esto, la 2da partida no dispara muertes ni
+        // objetivos porque lastDeathEventId y los timers quedan con valores viejos
+        // (los EventIDs del Live Client se numeran por partida).
+        if ("ChampSelect".equals(newPhase)) {
+            resetForNewGame();
+        }
+
         if ("InProgress".equals(oldPhase) && !"InProgress".equals(newPhase)) {
             LiveClientAllDataDTO liveData = gameStateService.getLiveGameData();
             if (liveData != null && liveData.activePlayer() != null) {
@@ -74,6 +82,22 @@ public class TriggerDetector {
         }
 
         previousPhase = newPhase;
+    }
+
+    /**
+     * Reinicia el estado de detección de triggers. Se llama al entrar a ChampSelect
+     * (nueva partida). Es importante no resetear al salir de InProgress porque el
+     * análisis de game-end usa los datos actuales.
+     */
+    private void resetForNewGame() {
+        lastDeathEventId = -1;
+        lastAnalysisTime = 0;
+        lastDragonKill = -1;
+        lastHeraldKill = -1;
+        lastBaronKill = -1;
+        lastHordeKill = -1;
+        lastObjectiveCheck = 0;
+        lastAlertedSpawn = -1;
     }
 
     private void onLiveGameUpdate(LiveClientAllDataDTO oldData, LiveClientAllDataDTO newData) {

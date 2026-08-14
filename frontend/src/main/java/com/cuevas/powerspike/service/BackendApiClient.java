@@ -4,6 +4,10 @@ import com.cuevas.powerspike.dto.CurrentGameInfo;
 import com.cuevas.powerspike.dto.MatchSummaryDTO;
 import com.cuevas.powerspike.dto.SummonerDTO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -17,12 +21,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * DataDragonClient y MatchService que antes estaban en el mismo proceso.
  *
  * El frontend nunca ve la API key de Riot: todo pasa por estos endpoints.
+ * Añade el token JWT de AuthService a cada request (excepto los públicos
+ * como /api/champions/*).
  */
 @Service
 public class BackendApiClient {
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final AuthService authService;
 
     // Pequeño caché en memoria de nombres de campeón, para no pegarle al backend
     // en cada render de una card de champ select / live game.
@@ -30,9 +37,20 @@ public class BackendApiClient {
     private volatile String cachedVersion;
 
     public BackendApiClient(RestTemplate restTemplate,
-                            @Value("${backend.base-url:http://localhost:8080}") String baseUrl) {
+                            @Value("${backend.base-url:http://localhost:8080}") String baseUrl,
+                            AuthService authService) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl;
+        this.authService = authService;
+    }
+
+    private HttpEntity<Void> authEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        String token = authService.getToken();
+        if (token != null && !token.isBlank()) {
+            headers.set("Authorization", "Bearer " + token);
+        }
+        return new HttpEntity<>(headers);
     }
 
     public String getChampionName(long championId) {
@@ -57,20 +75,25 @@ public class BackendApiClient {
     }
 
     public SummonerDTO getSummoner(String gameName, String tagLine) {
-        return restTemplate.getForObject(baseUrl + "/api/summoner/{gameName}/{tagLine}",
-                SummonerDTO.class, gameName, tagLine);
+        ResponseEntity<SummonerDTO> response = restTemplate.exchange(
+                baseUrl + "/api/summoner/{gameName}/{tagLine}",
+                HttpMethod.GET, authEntity(), SummonerDTO.class, gameName, tagLine);
+        return response.getBody();
     }
 
     public List<MatchSummaryDTO> getMatchHistory(String gameName, String tagLine, int count) {
-        MatchSummaryDTO[] matches = restTemplate.getForObject(
+        ResponseEntity<MatchSummaryDTO[]> response = restTemplate.exchange(
                 baseUrl + "/api/matches/{gameName}/{tagLine}?count={count}",
-                MatchSummaryDTO[].class, gameName, tagLine, count);
+                HttpMethod.GET, authEntity(), MatchSummaryDTO[].class, gameName, tagLine, count);
+        MatchSummaryDTO[] matches = response.getBody();
         return matches != null ? List.of(matches) : List.of();
     }
 
     public CurrentGameInfo getLiveGameBySpectator(String gameName, String tagLine) {
-        return restTemplate.getForObject(baseUrl + "/api/live-game/{gameName}/{tagLine}",
-                CurrentGameInfo.class, gameName, tagLine);
+        ResponseEntity<CurrentGameInfo> response = restTemplate.exchange(
+                baseUrl + "/api/live-game/{gameName}/{tagLine}",
+                HttpMethod.GET, authEntity(), CurrentGameInfo.class, gameName, tagLine);
+        return response.getBody();
     }
 
     public boolean isReachable() {
