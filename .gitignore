@@ -36,7 +36,7 @@ out/
 ### VS Code ###
 .vscode/
 # API Keys y variables de entorno
-application.properties
+# application.properties se commitea (ya no contiene secretos, solo placeholders de env vars)
 .env
 *.env
 
