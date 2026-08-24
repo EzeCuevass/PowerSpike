@@ -43,7 +43,7 @@ public class OpenAIClient {
 
             Contexto de mapa: ORDER = equipo azul (base abajo-izquierda, jungla a la izquierda), CHAOS = equipo rojo (base arriba-derecha, jungla a la derecha).
 
-            Cuando el análisis es sobre una muerte o un aviso en vivo, sé MUY breve (máximo 3 líneas, el jugador está jugando). Cuando es análisis de matchup, champ select o post-game, podés desarrollar más.
+            Cuando el análisis es sobre una muerte o un aviso en vivo, sé MUY breve (máximo 3 líneas, el jugador está jugando). Cuando es análisis de matchup, champ select o post-game, respondé como máximo 25 líneas en total.
             """;
 
     private final RestTemplate restTemplate;

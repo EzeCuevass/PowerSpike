@@ -61,8 +61,9 @@ public class PromptBuilder {
                 3. Build recomendada para esta partida en general
                 4. Debilidades de la composición enemiga
                 5. Qué va a querer hacer el equipo enemigo (teamfight, split push, pickoffs)
-                
+
                 Sé conciso. Es un análisis especulativo, no tenés los roles confirmados.
+                Cada punto debe ocupar 1 o 2 líneas como máximo. Respuesta total limitada a 25 LÍNEAS: no las excedas.
                 Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 ctx.mySummonerName(),
@@ -164,6 +165,7 @@ public class PromptBuilder {
                 6. Tips de posicionamiento y mecánica contra este campeón
 
                 Sé específico, no genérico. Conocés el matchup exacto.
+                Cada punto debe ocupar 1 o 2 líneas como máximo. Respuesta total limitada a 25 LÍNEAS: no las excedas.
                 Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 myPlayer.riotId(), myPlayer.championName(), myPlayer.position(),
@@ -196,12 +198,15 @@ public class PromptBuilder {
                 : 0;
         String csPerMinStr = csPerMin > 0 ? " (~" + String.format("%.1f", csPerMin) + " CS/min)" : "";
 
-        // Datos extra del active player (oro restante = ahorro pendiente, vida al morir)
+        // Regla de oro: solo mencionar gasto de oro si supera el umbral. Con consejo
+        // general (sin recomendar ítems específicos, para evitar alucinaciones).
         double gold = data.activePlayer() != null ? data.activePlayer().currentGold() : 0;
-        double maxHp = data.activePlayer() != null && data.activePlayer().championStats() != null
-                ? data.activePlayer().championStats().maxHealth() : 0;
-        String resourceText = "Oro restante: " + String.format("%.0f", gold) + " (por gastar)" +
-                (maxHp > 0 ? ". Vida máxima: " + String.format("%.0f", maxHp) : "");
+        String goldText;
+        if (gold >= 1500) {
+            goldText = "Oro restante: " + String.format("%.0f", gold) + " (alcanza para gastar: si es relevante, mencioná en el consejo que conviene volver y gastar el oro, sin nombrar ítems específicos).";
+        } else {
+            goldText = "Oro restante: " + String.format("%.0f", gold) + " (bajo: NO menciones gastar oro ni comprar ítems, es innecesario).";
+        }
 
         return """
                 Moriste en el minuto %d.
@@ -232,7 +237,7 @@ public class PromptBuilder {
                 myRole != null && !myRole.isEmpty() ? myRole : "rol desconocido",
                 myStats, csPerMinStr,
                 myItems,
-                resourceText,
+                goldText,
                 killerName,
                 killer != null ? killer.championName() : "desconocido",
                 killerStats,
@@ -358,14 +363,15 @@ public class PromptBuilder {
 
                 Referencias de calidad según rol: ADC/mid esperan ~7+ CS/min, support ~4-5, jungle se mide por objetivos y ganks. KP%% (kills + assists sobre total de kills del equipo) también cuenta.
 
-                Analizá mi rendimiento y damé:
+Analizá mi rendimiento y damé:
                 1. Resumen breve de cómo jugué
                 2. Qué hice bien
                 3. Qué errores tuve
                 4. 3 áreas concretas de mejora
                 5. Qué debería practicar para la próxima
 
-                Este análisis sí puede ser largo. Sé honesto y constructivo.
+                Cada sección debe ocupar 1 o 2 líneas como máximo. Respuesta total limitada a 25 LÍNEAS: no las excedas.
+                Sé honesto y constructivo.
                 """.formatted(
                 gameMinutes,
                 ctx.mySummonerName(),
