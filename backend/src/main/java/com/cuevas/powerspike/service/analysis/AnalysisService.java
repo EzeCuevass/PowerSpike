@@ -110,11 +110,11 @@ public class AnalysisService {
         int recentWards = countRecentWards(data.events(), deathEvent.EventTime());
         String visionText;
         if (hasVision) {
-            visionText = "Habías colocado visión en la zona.";
+            visionText = "Tenías visión colocada en la zona.";
         } else if (recentWards > 0) {
-            visionText = "Colocaste " + recentWards + " ward(s) recientemente pero no se sabe si cubrían esta zona.";
+            visionText = "Colocaste " + recentWards + " ward(s) recientemente pero no hay evidencia de que cubrieran esta zona.";
         } else {
-            visionText = "NO wardaste en los últimos 2 minutos. Probablemente estabas sin visión.";
+            visionText = "Sin evidencia de visión propia en la zona.";
         }
 
         int assisters = deathEvent.Assisters() != null ? deathEvent.Assisters().size() : 0;

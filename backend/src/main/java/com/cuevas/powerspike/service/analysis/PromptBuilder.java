@@ -62,8 +62,8 @@ public class PromptBuilder {
                 4. Debilidades de la composición enemiga
                 5. Qué va a querer hacer el equipo enemigo (teamfight, split push, pickoffs)
 
+                FORMATO OBLIGATORIO: Respondé EXACTAMENTE con 5 puntos numerados (1. a 5.), cada uno de MÁXIMO 2 líneas. El total de la respuesta NO puede superar 25 líneas. Punto final sin nada extra.
                 Sé conciso. Es un análisis especulativo, no tenés los roles confirmados.
-                Cada punto debe ocupar 1 o 2 líneas como máximo. Respuesta total limitada a 25 LÍNEAS: no las excedas.
                 Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 ctx.mySummonerName(),
@@ -164,8 +164,8 @@ public class PromptBuilder {
                 5. Estrategia de línea: ¿pusheás, freezás, roameás?
                 6. Tips de posicionamiento y mecánica contra este campeón
 
+                FORMATO OBLIGATORIO: Respondé EXACTAMENTE con 6 puntos numerados (1. a 6.), cada uno de MÁXIMO 2 líneas. El total de la respuesta NO puede superar 25 líneas. Punto final sin nada extra.
                 Sé específico, no genérico. Conocés el matchup exacto.
-                Cada punto debe ocupar 1 o 2 líneas como máximo. Respuesta total limitada a 25 LÍNEAS: no las excedas.
                 Usá saltos de línea para separar secciones y que la respuesta sea legible. No escribas todo en un solo párrafo.
                 """.formatted(
                 myPlayer.riotId(), myPlayer.championName(), myPlayer.position(),
@@ -229,6 +229,8 @@ public class PromptBuilder {
                 - %s
 
                 En la captura podés usar como referencia: minimapa (posiciones de aliados/enemigos, wards visibles), cooldowns visibles de habilidades e items, y la zona de la pantalla donde murió.
+
+                La visión se informa como contexto, pero NO la menciones en tu consejo salvo que creas que fue LA razón real de la muerte (por ejemplo, un enemigo se te acercó sin que lo vieras).
 
                 Dame un solo consejo accionable para la próxima, máximo 3 líneas. No repitas los datos que ya te di.
                 """.formatted(
@@ -370,7 +372,7 @@ Analizá mi rendimiento y damé:
                 4. 3 áreas concretas de mejora
                 5. Qué debería practicar para la próxima
 
-                Cada sección debe ocupar 1 o 2 líneas como máximo. Respuesta total limitada a 25 LÍNEAS: no las excedas.
+                FORMATO OBLIGATORIO: Respondé EXACTAMENTE con 5 secciones (1. a 5.), cada una de MÁXIMO 3 líneas. El total de la respuesta NO puede superar 25 líneas. Punto final sin nada extra.
                 Sé honesto y constructivo.
                 """.formatted(
                 gameMinutes,
