@@ -52,7 +52,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String path = request.getRequestURI();
         Bandwidth limit = limitFor(path);
-        String key = resolveKey(request, path);
+        String key = resolveKey(request, path) + "|" + limitName(path);
 
         ConsumptionProbe probe = rateLimitService.tryConsume(key, limit);
         if (probe.isConsumed()) {
@@ -68,6 +68,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
         response.setHeader("Retry-After", String.valueOf(retrySeconds));
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write("{\"error\": \"Demasiadas peticiones. Esperá un momento y reintentá.\"}");
+    }
+
+    private String limitName(String path) {
+        if (path.contains("/api/analysis/")) return "analysis";
+        if (path.contains("/api/users/login") || path.contains("/api/users/register")) return "auth";
+        if (path.contains("/api/matches/") || path.contains("/api/summoner/") || path.contains("/api/live-game/")) {
+            return "riot";
+        }
+        if (path.contains("/api/champions/")) return "champions";
+        return "default";
     }
 
     private Bandwidth limitFor(String path) {
