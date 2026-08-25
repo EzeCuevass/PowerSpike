@@ -56,6 +56,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         ConsumptionProbe probe = rateLimitService.tryConsume(key, limit);
         if (probe.isConsumed()) {
+            // Debug temporal: verificar que el filtro corre (remover luego)
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(probe.getRemainingTokens()));
+            response.setHeader("X-RateLimit-Key", key.substring(0, Math.min(key.length(), 30)));
             filterChain.doFilter(request, response);
             return;
         }
