@@ -2,6 +2,7 @@ package com.cuevas.powerspike;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +15,7 @@ import java.util.List;
  * lugar donde viven las API keys de Riot Games y OpenAI.
  */
 @SpringBootApplication
+@EnableScheduling
 public class PowerspikeBackendApplication {
 
     public static void main(String[] args) {
