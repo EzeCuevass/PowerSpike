@@ -198,11 +198,22 @@ public class PromptBuilder {
                 : 0;
         String csPerMinStr = csPerMin > 0 ? " (~" + String.format("%.1f", csPerMin) + " CS/min)" : "";
 
-        // Regla de oro: solo mencionar gasto de oro si supera el umbral. Con consejo
-        // general (sin recomendar ítems específicos, para evitar alucinaciones).
+        // Regla de oro: solo mencionar gasto de oro si supera el umbral Y no estás full build.
+        // El trinket no cuenta como item (ids conocidos de trinkets se excluyen del conteo).
         double gold = data.activePlayer() != null ? data.activePlayer().currentGold() : 0;
+
+        long realItems = 0;
+        if (myPlayer != null && myPlayer.items() != null) {
+            realItems = myPlayer.items().stream()
+                    .filter(i -> i.itemID() > 0 && !isTrinket(i.itemID()))
+                    .count();
+        }
+        boolean fullBuild = realItems >= 6;
+
         String goldText;
-        if (gold >= 1500) {
+        if (fullBuild) {
+            goldText = "Oro restante: " + String.format("%.0f", gold) + " (estás full build con " + realItems + " items: NO sugieras gastar oro ni volver a base, no tiene sentido).";
+        } else if (gold >= 1500) {
             goldText = "Oro restante: " + String.format("%.0f", gold) + " (alcanza para gastar: si es relevante, mencioná en el consejo que conviene volver y gastar el oro, sin nombrar ítems específicos).";
         } else {
             goldText = "Oro restante: " + String.format("%.0f", gold) + " (bajo: NO menciones gastar oro ni comprar ítems, es innecesario).";
@@ -506,5 +517,20 @@ Analizá mi rendimiento y damé:
                              (p.riotId() != null && p.riotId().contains(killerName)) ||
                              p.championName().equals(killerName))
                 .findFirst().orElse(null);
+    }
+
+    /**
+     * IDs de los trinkets del juego. El trinket NO cuenta como item para el conteo
+     * del full build (y de paso no menciona items como "Filo del Infinito").
+     */
+    private static final java.util.Set<Integer> TRINKET_IDS = java.util.Set.of(
+            3340, // Stealth Ward
+            3364, // Oracle Lens
+            3330, // Oracle Alteration
+            3513  // Farsight Alteration
+    );
+
+    private boolean isTrinket(int itemId) {
+        return TRINKET_IDS.contains(itemId);
     }
 }
