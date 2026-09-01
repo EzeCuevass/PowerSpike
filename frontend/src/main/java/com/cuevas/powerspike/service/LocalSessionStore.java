@@ -11,8 +11,13 @@ import java.nio.file.Files;
 
 /**
  * Persiste la sesión activa del invocador (login/logout) en un archivo JSON
- * local, en vez de una base de datos. Reemplaza a ActiveSession/ActiveSessionRepository
- * del monolito original.
+ * local (%APPDATA%/PowerSpike/session.json), en vez de una base de datos.
+ * Reemplaza a ActiveSession/ActiveSessionRepository del monolito original.
+ *
+ * Se usa APPDATA en vez de una ruta relativa (data/) porque, con la app
+ * empaquetada (jpackage), el working directory cambia y puede no ser
+ * escribible (ej. Program Files). APPDATA siempre es escribible y sobrevive
+ * a actualizaciones del programa.
  *
  * A futuro esto se reemplazará por un sistema de cuentas propio de PowerSpike
  * con login contra Riot, pero por ahora es simplemente un archivo local.
@@ -21,7 +26,16 @@ import java.nio.file.Files;
 public class LocalSessionStore {
 
     private static final Logger log = LoggerFactory.getLogger(LocalSessionStore.class);
-    private static final File SESSION_FILE = new File("data/session.json");
+    private static final File SESSION_FILE = storeFile("session.json");
+
+    private static File storeFile(String name) {
+        String appData = System.getenv("APPDATA");
+        if (appData != null && !appData.isBlank()) {
+            return new File(appData + "/PowerSpike/" + name);
+        }
+        // Fallback para entornos sin APPDATA (ej. Linux en dev)
+        return new File("data/" + name);
+    }
 
     private final ObjectMapper mapper = new ObjectMapper();
 

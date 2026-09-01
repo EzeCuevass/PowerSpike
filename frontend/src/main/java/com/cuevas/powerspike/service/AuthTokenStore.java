@@ -11,13 +11,28 @@ import java.nio.file.Files;
 
 /**
  * Persiste el token JWT de autenticación en un archivo JSON local
- * (data/auth.json), separado de la sesión de Riot (data/session.json).
+ * (%APPDATA%/PowerSpike/auth.json), separado de la sesión de Riot
+ * (%APPDATA%/PowerSpike/session.json).
+ *
+ * Se usa APPDATA en vez de una ruta relativa (data/) porque, con la app
+ * empaquetada (jpackage), el working directory cambia y puede no ser
+ * escribible (ej. Program Files). APPDATA siempre es escribible y sobrevive
+ * a actualizaciones del programa.
  */
 @Service
 public class AuthTokenStore {
 
     private static final Logger log = LoggerFactory.getLogger(AuthTokenStore.class);
-    private static final File AUTH_FILE = new File("data/auth.json");
+    private static final File AUTH_FILE = storeFile("auth.json");
+
+    private static File storeFile(String name) {
+        String appData = System.getenv("APPDATA");
+        if (appData != null && !appData.isBlank()) {
+            return new File(appData + "/PowerSpike/" + name);
+        }
+        // Fallback para entornos sin APPDATA (ej. Linux en dev)
+        return new File("data/" + name);
+    }
 
     private final ObjectMapper mapper = new ObjectMapper();
 

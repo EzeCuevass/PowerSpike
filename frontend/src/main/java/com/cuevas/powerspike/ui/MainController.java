@@ -5,6 +5,7 @@ import com.cuevas.powerspike.dto.*;
 import com.cuevas.powerspike.service.AuthService;
 import com.cuevas.powerspike.service.BackendApiClient;
 import com.cuevas.powerspike.service.GameStateService;
+import com.cuevas.powerspike.service.UpdaterService;
 import com.cuevas.powerspike.service.analysis.AnalysisApiClient;
 import com.cuevas.powerspike.service.analysis.AnalysisResult;
 import javafx.fxml.FXML;
@@ -93,21 +94,27 @@ public class MainController {
     private final GameStateService gameStateService;
     private final AnalysisApiClient analysisApiClient;
     private final AuthService authService;
+    private final UpdaterService updaterService;
 
     private boolean registerMode = false;
 
     public MainController(BackendApiClient backendApiClient,
                           GameStateService gameStateService,
                           AnalysisApiClient analysisApiClient,
-                          AuthService authService) {
+                          AuthService authService,
+                          UpdaterService updaterService) {
         this.backendApiClient = backendApiClient;
         this.gameStateService = gameStateService;
         this.analysisApiClient = analysisApiClient;
         this.authService = authService;
+        this.updaterService = updaterService;
     }
 
     @FXML
     public void initialize() {
+        // Chequear actualizaciones en background (no bloquea la UI)
+        updaterService.checkForUpdatesAsync();
+
         searchButton.setOnAction(e -> buscarInvocador());
         gameNameField.setOnAction(e -> buscarInvocador());
         tagLineField.setOnAction(e -> buscarInvocador());
