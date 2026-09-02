@@ -20,8 +20,8 @@ if not errorlevel 1 (
     goto waitloop
 )
 
-rem --- 3. Capturar el .msi de la misma carpeta ---
-for %%f in (PowerSpike-*.msi) do set MSI_FILE=%%f
+rem --- 3. Capturar el .msi de la misma carpeta (%~dp0 = carpeta del script, no el CWD) ---
+for %%f in ("%~dp0PowerSpike-*.msi") do set "MSI_FILE=%%~nxf"
 if not defined MSI_FILE (
     echo [PowerSpike] ERROR: no se encontro el .msi en la carpeta de updates.
     pause
